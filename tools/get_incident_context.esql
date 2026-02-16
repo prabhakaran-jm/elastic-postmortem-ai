@@ -1,0 +1,47 @@
+// =============================================================================
+// get_incident_context.esql
+// =============================================================================
+// Goal: Given incident_id and time range, produce a single chronological
+//       timeline (deploy → alert → errors → on-call ack → rollback → recovery).
+//
+// Logical structure (ES|QL has no UNION ALL; we use single FROM + CASE):
+//   1) Pulls logs:     pmai-logs,     incident_id, level IN (WARN,ERROR), ts, kind="log", ref, service, summary=message
+//   2) Pulls alerts:   pmai-alerts,   incident_id, ts, kind="alert", ref, service, summary (firing vs resolved via CASE)
+//   3) Pulls changes:  pmai-changes,  incident_id, ts, kind="change", ref, service, summary=title
+//   4) Pulls chat:     pmai-chat_messages, incident_id, ts, kind="chat", ref=id, service="communication", summary=message
+//   5) Pulls tickets:  pmai-tickets, incident_id, ts, kind="ticket", ref, service, summary=title
+//   Combine: single FROM over all indices; normalize with EVAL/CASE.
+//   Then: SORT ts ASC
+//
+// Output columns: ts, kind, ref, service, summary
+// No IF() — use CASE(condition, value, ..., elseValue) only.
+// =============================================================================
+
+FROM pmai-logs, pmai-alerts, pmai-changes, pmai-chat_messages, pmai-tickets
+  METADATA _index
+| WHERE @timestamp >= "2026-02-10T09:58:00Z" AND @timestamp <= "2026-02-10T10:40:00Z"
+  AND (incident_id IS NULL OR incident_id == "{{INCIDENT_ID}}")
+  AND (_index != "pmai-logs" OR level == "WARN" OR level == "ERROR")
+| EVAL
+    ts = @timestamp,
+    kind = CASE(
+      _index == "pmai-logs", "log",
+      _index == "pmai-alerts", "alert",
+      _index == "pmai-changes", "change",
+      _index == "pmai-chat_messages", "chat",
+      _index == "pmai-tickets", "ticket",
+      "other"
+    ),
+    ref = id,
+    service = CASE(_index == "pmai-chat_messages", "communication", COALESCE(service, source, "")),
+    summary = CASE(
+      _index == "pmai-logs",            CONCAT("[LOG] ", COALESCE(message, "")),
+      _index == "pmai-alerts",          CONCAT("[ALERT] ", COALESCE(message, "")),
+      _index == "pmai-changes",         CONCAT("[CHANGE] ", COALESCE(title, "")),
+      _index == "pmai-chat_messages",   CONCAT("[CHAT] ", COALESCE(message, "")),
+      _index == "pmai-tickets",         COALESCE(title, ""),
+      ""
+    )
+| KEEP ts, kind, ref, service, summary
+| SORT ts ASC
+| LIMIT 200
