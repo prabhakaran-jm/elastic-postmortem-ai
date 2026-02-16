@@ -1,0 +1,20 @@
+{"index":{"_index":"{{INDEX_PREFIX}}-logs","_id":"E-100"}}
+{"id":"E-100","incident_id":"INC-1042","level":"INFO","logger":"deploy","service":"api-gateway","source":"ci","message":"Deploy start: DEP-7781 api-gateway v2.14.0 to prod","@timestamp":"2026-02-10T10:00:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-logs","_id":"E-101"}}
+{"id":"E-101","incident_id":"INC-1042","level":"WARN","logger":"runtime","service":"api-gateway","source":"app","message":"Memory pressure increasing; GC frequency up","@timestamp":"2026-02-10T10:02:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-logs","_id":"E-102"}}
+{"id":"E-102","incident_id":"INC-1042","level":"WARN","logger":"runtime","service":"api-gateway","source":"app","message":"Heap usage above 80%","@timestamp":"2026-02-10T10:02:50Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-logs","_id":"E-103"}}
+{"id":"E-103","incident_id":"INC-1042","level":"WARN","logger":"http","service":"api-gateway","source":"app","message":"Upstream timeouts from auth-service","@timestamp":"2026-02-10T10:03:15Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-logs","_id":"E-104"}}
+{"id":"E-104","incident_id":"INC-1042","level":"WARN","logger":"http","service":"api-gateway","source":"app","message":"Retry backoff for auth-service","@timestamp":"2026-02-10T10:03:40Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-logs","_id":"E-105"}}
+{"id":"E-105","incident_id":"INC-1042","level":"ERROR","logger":"http","service":"api-gateway","source":"app","message":"5xx errors spiking; returning 503 from multiple routes","@timestamp":"2026-02-10T10:04:10Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-logs","_id":"E-106"}}
+{"id":"E-106","incident_id":"INC-1042","level":"WARN","logger":"http","service":"api-gateway","source":"app","message":"Circuit breaker open for auth-service","@timestamp":"2026-02-10T10:05:30Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-logs","_id":"E-107"}}
+{"id":"E-107","incident_id":"INC-1042","level":"INFO","logger":"deploy","service":"api-gateway","source":"ci","message":"Rollback start: DEP-7781 api-gateway to v2.13.2","@timestamp":"2026-02-10T10:28:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-logs","_id":"E-108"}}
+{"id":"E-108","incident_id":"INC-1042","level":"INFO","logger":"deploy","service":"api-gateway","source":"ci","message":"Rollback complete; health checks passing","@timestamp":"2026-02-10T10:30:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-logs","_id":"E-109"}}
+{"id":"E-109","incident_id":"INC-1042","level":"INFO","logger":"runtime","service":"api-gateway","source":"app","message":"Service recovered; 5xx rate normal","@timestamp":"2026-02-10T10:32:00Z"}

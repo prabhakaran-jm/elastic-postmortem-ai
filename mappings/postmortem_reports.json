@@ -1,0 +1,16 @@
+{
+  "mappings": {
+    "properties": {
+      "id": { "type": "keyword" },
+      "incident_id": { "type": "keyword" },
+      "status": { "type": "keyword" },
+      "author": { "type": "keyword" },
+      "title": { "type": "text" },
+      "summary": { "type": "text" },
+      "content": { "type": "text" },
+      "notes": { "type": "text" },
+      "@timestamp": { "type": "date" },
+      "updated_at": { "type": "date" }
+    }
+  }
+}

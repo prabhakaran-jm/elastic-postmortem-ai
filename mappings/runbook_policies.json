@@ -1,0 +1,15 @@
+{
+  "mappings": {
+    "properties": {
+      "id": { "type": "keyword" },
+      "policy_type": { "type": "keyword" },
+      "version": { "type": "integer" },
+      "name": { "type": "keyword" },
+      "title": { "type": "text" },
+      "description": { "type": "text" },
+      "content": { "type": "text" },
+      "notes": { "type": "text" },
+      "@timestamp": { "type": "date" }
+    }
+  }
+}

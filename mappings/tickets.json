@@ -1,0 +1,16 @@
+{
+  "mappings": {
+    "properties": {
+      "id": { "type": "keyword" },
+      "status": { "type": "keyword" },
+      "priority": { "type": "keyword" },
+      "assignee": { "type": "keyword" },
+      "source": { "type": "keyword" },
+      "title": { "type": "text" },
+      "description": { "type": "text" },
+      "notes": { "type": "text" },
+      "@timestamp": { "type": "date" },
+      "updated_at": { "type": "date" }
+    }
+  }
+}

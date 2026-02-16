@@ -1,0 +1,1 @@
+{"mappings":{"properties":{"id":{"type":"keyword"},"incident_id":{"type":"keyword"},"level":{"type":"keyword"},"logger":{"type":"keyword"},"service":{"type":"keyword"},"source":{"type":"keyword"},"message":{"type":"text"},"@timestamp":{"type":"date"}}}}

@@ -1,0 +1,20 @@
+{
+  "mappings": {
+    "properties": {
+      "id": { "type": "keyword" },
+      "channel": { "type": "keyword" },
+      "thread_id": { "type": "keyword" },
+      "role": { "type": "keyword" },
+      "sender": { "type": "keyword" },
+      "message": { "type": "text" },
+      "@timestamp": { "type": "date" }
+    }
+  },
+  "_optional_embedding_mapping": {
+    "embedding": {
+      "type": "dense_vector",
+      "dims": 384,
+      "index": false
+    }
+  }
+}

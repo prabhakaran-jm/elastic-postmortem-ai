@@ -1,0 +1,4 @@
+{"index":{"_index":"{{INDEX_PREFIX}}-changes","_id":"DEP-7781"}}
+{"id":"DEP-7781","change_type":"deploy","entity_type":"service","author":"ops-alice","source":"ci","title":"Deploy api-gateway v2.14.0 to prod","description":"Standard deploy of api-gateway; single approval observed, change executed out of window.","notes":"approvals_required=2, approvals_observed=1, change_window=out_of_window","approvals_required":2,"approvals_observed":1,"change_window":"out_of_window","@timestamp":"2026-02-10T10:00:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-changes","_id":"RB-7781"}}
+{"id":"RB-7781","change_type":"rollback","entity_type":"service","author":"sre-bob","source":"ci","title":"Rollback api-gateway to v2.13.2","description":"Emergency rollback DEP-7781 after CPU and 5xx spike.","notes":"approvals_required=1, approvals_observed=1, change_window=in_window","approvals_required":1,"approvals_observed":1,"change_window":"in_window","@timestamp":"2026-02-10T10:27:00Z"}

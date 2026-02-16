@@ -1,0 +1,12 @@
+{"index":{"_index":"{{INDEX_PREFIX}}-chat_messages","_id":"CHAT-7781-1"}}
+{"id":"CHAT-7781-1","channel":"#releases","thread_id":"DEP-7781","role":"engineer","sender":"dev-alice","message":"DEP-7781 ready for api-gateway v2.14.0 — can we deploy at 10am?","@timestamp":"2026-02-10T09:58:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-chat_messages","_id":"CHAT-7781-2"}}
+{"id":"CHAT-7781-2","channel":"#releases","thread_id":"DEP-7781","role":"sre","sender":"sre-bob","message":"Reminder: prod deploys need 2 explicit approvals and must be in change window.","@timestamp":"2026-02-10T09:59:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-chat_messages","_id":"CHAT-7781-3"}}
+{"id":"CHAT-7781-3","channel":"#releases","thread_id":"DEP-7781","role":"manager","sender":"mgr-jordan","message":"Proceed with caution — keep an eye on metrics.","@timestamp":"2026-02-10T10:00:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-chat_messages","_id":"CHAT-7781-4"}}
+{"id":"CHAT-7781-4","channel":"#releases","thread_id":"DEP-7781","role":"engineer","sender":"dev-alice","message":"Starting deploy DEP-7781 now.","@timestamp":"2026-02-10T10:00:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-chat_messages","_id":"CHAT-7781-5"}}
+{"id":"CHAT-7781-5","channel":"#incidents","thread_id":"INC-1042","role":"oncall","sender":"ops-alice","message":"Acknowledged — investigating CPU and 5xx alerts.","@timestamp":"2026-02-10T10:04:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-chat_messages","_id":"CHAT-7781-6"}}
+{"id":"CHAT-7781-6","channel":"#incidents","thread_id":"INC-1042","role":"sre","sender":"sre-bob","message":"Initiating rollback DEP-7781.","@timestamp":"2026-02-10T10:27:00Z"}

@@ -1,0 +1,8 @@
+{"index":{"_index":"{{INDEX_PREFIX}}-metrics","_id":"M-CPU-1042-1"}}
+{"id":"M-CPU-1042-1","name":"cpu_util_pct","unit":"percent","source":"api-gateway","value":24.5,"@timestamp":"2026-02-10T09:59:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-metrics","_id":"M-CPU-1042-2"}}
+{"id":"M-CPU-1042-2","name":"cpu_util_pct","unit":"percent","source":"api-gateway","value":94.2,"@timestamp":"2026-02-10T10:03:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-metrics","_id":"M-CPU-1042-3"}}
+{"id":"M-CPU-1042-3","name":"cpu_util_pct","unit":"percent","source":"api-gateway","value":28.1,"@timestamp":"2026-02-10T10:30:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-metrics","_id":"M-5XX-1042"}}
+{"id":"M-5XX-1042","name":"5xx_rate_pct","unit":"percent","source":"api-gateway","value":12.3,"count":1847,"@timestamp":"2026-02-10T10:20:00Z"}

@@ -1,0 +1,13 @@
+{
+  "mappings": {
+    "properties": {
+      "id": { "type": "keyword" },
+      "name": { "type": "keyword" },
+      "unit": { "type": "keyword" },
+      "source": { "type": "keyword" },
+      "value": { "type": "double" },
+      "count": { "type": "integer" },
+      "@timestamp": { "type": "date" }
+    }
+  }
+}

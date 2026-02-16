@@ -1,0 +1,14 @@
+{
+  "mappings": {
+    "properties": {
+      "id": { "type": "keyword" },
+      "rule_id": { "type": "keyword" },
+      "status": { "type": "keyword" },
+      "severity": { "type": "keyword" },
+      "source": { "type": "keyword" },
+      "title": { "type": "text" },
+      "message": { "type": "text" },
+      "@timestamp": { "type": "date" }
+    }
+  }
+}

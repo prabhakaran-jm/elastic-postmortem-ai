@@ -1,0 +1,15 @@
+{
+  "mappings": {
+    "properties": {
+      "id": { "type": "keyword" },
+      "change_type": { "type": "keyword" },
+      "entity_type": { "type": "keyword" },
+      "author": { "type": "keyword" },
+      "source": { "type": "keyword" },
+      "title": { "type": "text" },
+      "description": { "type": "text" },
+      "notes": { "type": "text" },
+      "@timestamp": { "type": "date" }
+    }
+  }
+}

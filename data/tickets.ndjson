@@ -1,0 +1,4 @@
+{"index":{"_index":"{{INDEX_PREFIX}}-tickets","_id":"TKT-1042"}}
+{"id":"TKT-1042","status":"closed","priority":"high","assignee":"ops-alice","source":"incident","title":"INC-1042: Production 5xx after DEP-7781","description":"Track incident and rollback; post-mortem to follow.","notes":"Linked to DEP-7781 and INC-1042","@timestamp":"2026-02-10T10:25:00Z","updated_at":"2026-02-10T10:40:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-tickets","_id":"TKT-ROLLBACK-7781"}}
+{"id":"TKT-ROLLBACK-7781","status":"closed","priority":"critical","assignee":"ops-alice","source":"ci","title":"Rollback DEP-7781 api-gateway","description":"Emergency rollback due to CPU and 5xx spike.","@timestamp":"2026-02-10T10:27:00Z","updated_at":"2026-02-10T10:38:00Z"}

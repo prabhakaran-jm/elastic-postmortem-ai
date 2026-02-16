@@ -1,0 +1,8 @@
+{"index":{"_index":"{{INDEX_PREFIX}}-alerts","_id":"ALT-CPU-1042"}}
+{"id":"ALT-CPU-1042","rule_id":"cpu-high-prod","status":"firing","severity":"critical","source":"monitoring","title":"CPU utilization above 90%","message":"api-gateway pool CPU 94% for 5m","@timestamp":"2026-02-10T10:03:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-alerts","_id":"ALT-5XX-1042"}}
+{"id":"ALT-5XX-1042","rule_id":"5xx-rate-prod","status":"firing","severity":"critical","source":"monitoring","title":"5xx error rate elevated","message":"5xx rate 12% on api-gateway","@timestamp":"2026-02-10T10:04:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-alerts","_id":"ALT-CPU-1042-RESOLVED"}}
+{"id":"ALT-CPU-1042-RESOLVED","rule_id":"cpu-high-prod","status":"resolved","severity":"critical","source":"monitoring","title":"CPU utilization above 90%","message":"api-gateway pool CPU back to normal after rollback","@timestamp":"2026-02-10T10:29:00Z"}
+{"index":{"_index":"{{INDEX_PREFIX}}-alerts","_id":"ALT-5XX-1042-RESOLVED"}}
+{"id":"ALT-5XX-1042-RESOLVED","rule_id":"5xx-rate-prod","status":"resolved","severity":"critical","source":"monitoring","title":"5xx error rate elevated","message":"5xx rate normalized post-rollback","@timestamp":"2026-02-10T10:29:00Z"}
