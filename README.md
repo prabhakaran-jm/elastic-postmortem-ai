@@ -64,6 +64,38 @@ python scripts/verify.py
 
 ---
 
+## Day 2 – Incident timeline (ES|QL)
+
+Run the ES|QL query to fetch a single chronological timeline (logs, alerts, changes, chat, tickets) for an incident.
+
+```bash
+python scripts/run_esql.py --file tools/get_incident_context.esql --incident INC-1042
+```
+
+Prints a table: `ts | kind | service | ref | summary`.
+
+---
+
+## Day 3 – Narrator Agent
+
+The Narrator fetches the incident timeline (ES|QL), then generates an evidence-backed post-mortem.
+
+**Outputs:** `out/postmortem_<incident_id>.md` and `out/postmortem_<incident_id>.json` (summary, impact, timeline, claims, root causes, follow-ups).
+
+**Run:**
+
+```bash
+# Generate markdown + JSON only
+python scripts/narrator_runner.py --incident INC-1042
+
+# Also upsert the report into the postmortem_reports index (draft)
+python scripts/narrator_runner.py --incident INC-1042 --store
+```
+
+Runs in **mock mode** (deterministic from timeline) unless `OPENAI_API_KEY` is set in `.env`.
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
