@@ -255,6 +255,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run Narrator: fetch timeline, generate postmortem JSON + MD.")
     parser.add_argument("--incident", default="INC-1042", help="Incident ID (default: INC-1042)")
     parser.add_argument("--store", action="store_true", help="Upsert report into Elasticsearch postmortem_reports index")
+    parser.add_argument("--inject_error", action="store_true", help="Inject a bad evidence ref so auditor will challenge (demo)")
     args = parser.parse_args()
     incident_id = args.incident
 
@@ -273,6 +274,11 @@ def main() -> None:
     data = run_openai_narrator(incident_id, start_ts, end_ts, timeline)
     if data is None:
         data = run_mock_narrator(incident_id, timeline, start_ts, end_ts)
+
+    if getattr(args, "inject_error", False):
+        claims_list = data.get("claims", [])
+        if claims_list:
+            claims_list[2]["evidence_refs"] = list(claims_list[2].get("evidence_refs", [])) + ["E-99"]
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     json_path = OUT_DIR / f"postmortem_{incident_id}.json"
