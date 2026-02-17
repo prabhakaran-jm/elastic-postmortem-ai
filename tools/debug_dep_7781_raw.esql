@@ -1,0 +1,14 @@
+FROM pmai-changes
+| WHERE id == "DEP-7781"
+| EVAL ts = @timestamp
+| KEEP ts,
+       id,
+       title,
+       change_type,
+       author,
+       approvals_required,
+       approvals_observed,
+       change_window,
+       notes
+| SORT ts ASC
+| LIMIT 5

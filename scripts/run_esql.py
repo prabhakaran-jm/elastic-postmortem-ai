@@ -36,6 +36,11 @@ def main() -> None:
         default="INC-1042",
         help="Incident ID for {{INCIDENT_ID}} placeholder (default: INC-1042)",
     )
+    parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="Print actual columns and rows (no fixed timeline format).",
+    )
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
@@ -66,7 +71,22 @@ def main() -> None:
         sys.exit(1)
 
     col_names = [c.get("name", "") for c in columns]
-    # Output order: ts | kind | service | ref | summary
+
+    def str_cell(v) -> str:
+        return "" if v is None else str(v)
+
+    if args.raw:
+        # Raw: actual columns in order, values separated by " | ", null -> ""
+        print(" | ".join(col_names))
+        if not values:
+            print("No rows")
+        else:
+            for row in values:
+                parts = [str_cell(row[i]) if i < len(row) else "" for i in range(len(col_names))]
+                print(" | ".join(parts))
+        return
+
+    # Default: timeline format (fixed columns ts, kind, service, ref, summary)
     want = ["ts", "kind", "service", "ref", "summary"]
     indices = []
     for w in want:
@@ -78,17 +98,17 @@ def main() -> None:
     def cell(i: int, row: list) -> str:
         if i is None or i >= len(row):
             return ""
-        v = row[i]
-        return "" if v is None else str(v)
+        return str_cell(row[i])
 
-    # Header
     header = " | ".join(want)
     print(header)
     print("-" * min(120, len(header) + 20))
-
-    for row in values:
-        parts = [cell(i, row) for i in indices]
-        print(" | ".join(parts))
+    if not values:
+        print("No rows")
+    else:
+        for row in values:
+            parts = [cell(i, row) for i in indices]
+            print(" | ".join(parts))
 
 
 if __name__ == "__main__":

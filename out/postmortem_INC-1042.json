@@ -1,6 +1,6 @@
 {
   "incident_id": "INC-1042",
-  "generated_at": "2026-02-17T12:56:06Z",
+  "generated_at": "2026-02-17T19:45:31Z",
   "time_window": {
     "start": "2026-02-10T09:58:00.000Z",
     "end": "2026-02-10T10:29:00.000Z"
@@ -31,14 +31,7 @@
       "kind": "change",
       "service": "ci",
       "ref": "DEP-7781",
-      "summary": "[CHANGE] Deploy api-gateway v2.14.0 to prod"
-    },
-    {
-      "ts": "2026-02-10T10:00:00.000Z",
-      "kind": "chat",
-      "service": "communication",
-      "ref": "CHAT-7781-4",
-      "summary": "[CHAT] Starting deploy DEP-7781 now."
+      "summary": "[CHANGE] Deploy api-gateway v2.14.0 to prod (approvals 1/2, window=out_of_window, author=ops-alice)"
     },
     {
       "ts": "2026-02-10T10:00:00.000Z",
@@ -46,6 +39,13 @@
       "service": "communication",
       "ref": "CHAT-7781-3",
       "summary": "[CHAT] Proceed with caution \u2014 keep an eye on metrics."
+    },
+    {
+      "ts": "2026-02-10T10:00:00.000Z",
+      "kind": "chat",
+      "service": "communication",
+      "ref": "CHAT-7781-4",
+      "summary": "[CHAT] Starting deploy DEP-7781 now."
     },
     {
       "ts": "2026-02-10T10:02:00.000Z",
@@ -84,17 +84,17 @@
     },
     {
       "ts": "2026-02-10T10:04:00.000Z",
-      "kind": "alert",
-      "service": "monitoring",
-      "ref": "ALT-5XX-1042",
-      "summary": "[ALERT] 5xx rate 12% on api-gateway"
-    },
-    {
-      "ts": "2026-02-10T10:04:00.000Z",
       "kind": "chat",
       "service": "communication",
       "ref": "CHAT-7781-5",
       "summary": "[CHAT] Acknowledged \u2014 investigating CPU and 5xx alerts."
+    },
+    {
+      "ts": "2026-02-10T10:04:00.000Z",
+      "kind": "alert",
+      "service": "monitoring",
+      "ref": "ALT-5XX-1042",
+      "summary": "[ALERT] 5xx rate 12% on api-gateway"
     },
     {
       "ts": "2026-02-10T10:04:10.000Z",
@@ -126,24 +126,17 @@
     },
     {
       "ts": "2026-02-10T10:27:00.000Z",
-      "kind": "change",
-      "service": "ci",
-      "ref": "RB-7781",
-      "summary": "[CHANGE] Rollback api-gateway to v2.13.2"
-    },
-    {
-      "ts": "2026-02-10T10:27:00.000Z",
       "kind": "chat",
       "service": "communication",
       "ref": "CHAT-7781-6",
       "summary": "[CHAT] Initiating rollback DEP-7781."
     },
     {
-      "ts": "2026-02-10T10:29:00.000Z",
-      "kind": "alert",
-      "service": "monitoring",
-      "ref": "ALT-CPU-1042-RESOLVED",
-      "summary": "[ALERT] api-gateway pool CPU back to normal after rollback"
+      "ts": "2026-02-10T10:27:00.000Z",
+      "kind": "change",
+      "service": "ci",
+      "ref": "RB-7781",
+      "summary": "[CHANGE] Rollback api-gateway to v2.13.2 (approvals 1/1, window=in_window, author=sre-bob)"
     },
     {
       "ts": "2026-02-10T10:29:00.000Z",
@@ -151,6 +144,13 @@
       "service": "monitoring",
       "ref": "ALT-5XX-1042-RESOLVED",
       "summary": "[ALERT] 5xx rate normalized post-rollback"
+    },
+    {
+      "ts": "2026-02-10T10:29:00.000Z",
+      "kind": "alert",
+      "service": "monitoring",
+      "ref": "ALT-CPU-1042-RESOLVED",
+      "summary": "[ALERT] api-gateway pool CPU back to normal after rollback"
     }
   ],
   "claims": [
@@ -201,8 +201,8 @@
       "claim_id": "CLM-006",
       "statement": "Alerts resolved and service recovered.",
       "evidence_refs": [
-        "ALT-CPU-1042-RESOLVED",
-        "ALT-5XX-1042-RESOLVED"
+        "ALT-5XX-1042-RESOLVED",
+        "ALT-CPU-1042-RESOLVED"
       ],
       "confidence": 0.85
     }

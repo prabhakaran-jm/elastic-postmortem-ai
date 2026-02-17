@@ -1,0 +1,4 @@
+FROM pmai-changes
+| WHERE id == "DEP-7781"
+| SORT @timestamp ASC
+| LIMIT 5

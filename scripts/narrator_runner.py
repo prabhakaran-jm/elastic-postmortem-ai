@@ -51,6 +51,35 @@ def fetch_timeline(incident_id: str) -> List[dict]:
     return rows
 
 
+def enrich_change_summaries(timeline: List[dict], client) -> None:
+    """For timeline rows with kind 'change' and ref DEP-* or RB-*, append governance fields to summary."""
+    idx = index_name("changes")
+    for row in timeline:
+        if row.get("kind") != "change":
+            continue
+        ref = row.get("ref") or ""
+        if not (ref.startswith("DEP-") or ref.startswith("RB-")):
+            continue
+        try:
+            doc = client.get(index=idx, id=ref)
+            src = doc.get("_source") or {}
+        except Exception:
+            continue
+        parts = []
+        req = src.get("approvals_required")
+        obs = src.get("approvals_observed")
+        if req is not None and obs is not None:
+            parts.append(f"approvals {obs}/{req}")
+        w = src.get("change_window")
+        if w is not None and str(w).strip() != "":
+            parts.append(f"window={w}")
+        author = src.get("author")
+        if author is not None and str(author).strip() != "":
+            parts.append(f"author={author}")
+        if parts:
+            row["summary"] = (row.get("summary") or "") + " (" + ", ".join(parts) + ")"
+
+
 def _parse_ts(ts: str) -> datetime | None:
     try:
         if ts.endswith("Z"):
@@ -267,6 +296,7 @@ def main() -> None:
     if not timeline:
         print("No timeline rows returned.", file=sys.stderr)
         sys.exit(1)
+    enrich_change_summaries(timeline, get_client())
 
     start_ts = timeline[0].get("ts", "")
     end_ts = timeline[-1].get("ts", "")
