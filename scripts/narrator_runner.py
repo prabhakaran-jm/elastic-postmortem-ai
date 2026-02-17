@@ -52,32 +52,49 @@ def fetch_timeline(incident_id: str) -> List[dict]:
 
 
 def enrich_change_summaries(timeline: List[dict], client) -> None:
-    """For timeline rows with kind 'change' and ref DEP-* or RB-*, append governance fields to summary."""
+    """For timeline rows with kind 'change' and ref DEP-*, append governance fields to summary.
+    Safe: missing/404 change doc or unexpected fields do not crash; summary left unchanged."""
     idx = index_name("changes")
     for row in timeline:
         if row.get("kind") != "change":
             continue
-        ref = row.get("ref") or ""
-        if not (ref.startswith("DEP-") or ref.startswith("RB-")):
+        ref = (row.get("ref") or "").strip()
+        if not ref.startswith("DEP-"):
             continue
         try:
             doc = client.get(index=idx, id=ref)
-            src = doc.get("_source") or {}
+            src = doc.get("_source") if isinstance(doc.get("_source"), dict) else {}
+            if not src:
+                src = {}
         except Exception:
             continue
-        parts = []
-        req = src.get("approvals_required")
-        obs = src.get("approvals_observed")
-        if req is not None and obs is not None:
-            parts.append(f"approvals {obs}/{req}")
-        w = src.get("change_window")
-        if w is not None and str(w).strip() != "":
-            parts.append(f"window={w}")
+        approvals_required = src.get("approvals_required")
+        approvals_observed = src.get("approvals_observed")
+        change_window = src.get("change_window")
         author = src.get("author")
+        parts = []
+        if approvals_required is not None and approvals_observed is not None:
+            parts.append(f"approvals {approvals_observed}/{approvals_required}")
+        if change_window is not None and str(change_window).strip() != "":
+            parts.append(f"window={change_window}")
         if author is not None and str(author).strip() != "":
             parts.append(f"author={author}")
         if parts:
             row["summary"] = (row.get("summary") or "") + " (" + ", ".join(parts) + ")"
+
+
+def decision_integrity_artifacts_from_timeline(timeline: List[dict]) -> List[str]:
+    """Return unique DEP-* and RB-* refs from timeline in timeline order. No invented refs."""
+    seen = set()
+    out = []
+    for row in timeline:
+        ref = (row.get("ref") or "").strip()
+        if not ref or ref in seen:
+            continue
+        if ref.startswith("DEP-") or ref.startswith("RB-"):
+            seen.add(ref)
+            out.append(ref)
+    return out
 
 
 def _parse_ts(ts: str) -> datetime | None:
@@ -258,6 +275,13 @@ def render_markdown(data: dict) -> str:
     lines.append(f"- **Duration:** {impact.get('duration_minutes', 0)} minutes")
     lines.append(f"- **Severity:** {impact.get('severity', '')}")
     lines.append("")
+    artifacts = data.get("decision_integrity_artifacts", [])
+    if artifacts:
+        lines.append("## Decision integrity artifacts")
+        lines.append("")
+        for ref in artifacts:
+            lines.append(f"- {ref}")
+        lines.append("")
     lines.append("## Timeline")
     lines.append("| ts | kind | service | ref | summary |")
     lines.append("| --- | --- | --- | --- | --- |")
@@ -309,6 +333,8 @@ def main() -> None:
         claims_list = data.get("claims", [])
         if claims_list:
             claims_list[2]["evidence_refs"] = list(claims_list[2].get("evidence_refs", [])) + ["E-99"]
+
+    data["decision_integrity_artifacts"] = decision_integrity_artifacts_from_timeline(data.get("timeline", []))
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     json_path = OUT_DIR / f"postmortem_{incident_id}.json"
