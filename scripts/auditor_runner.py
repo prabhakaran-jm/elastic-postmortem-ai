@@ -6,7 +6,7 @@ import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -143,6 +143,32 @@ def audit_claims(
     return validated, challenged, findings
 
 
+def parse_change_summary_suffix(summary: str) -> Optional[Dict[str, Any]]:
+    """Parse enriched suffix '(approvals 1/2, window=..., author=...)' from timeline row summary. Returns dict or None."""
+    if not summary or "(" not in summary or ")" not in summary:
+        return None
+    match = re.search(r"\(([^)]+)\)\s*$", summary.strip())
+    if not match:
+        return None
+    inner = match.group(1).strip()
+    out = {}
+    for part in (p.strip() for p in inner.split(",")):
+        if not part:
+            continue
+        if part.startswith("approvals ") and "/" in part:
+            try:
+                a, b = re.search(r"approvals\s+(\d+)/(\d+)", part).groups()
+                out["approvals_observed"] = int(a)
+                out["approvals_required"] = int(b)
+            except (AttributeError, ValueError):
+                pass
+        elif part.startswith("window="):
+            out["change_window"] = part[7:].strip()
+        elif part.startswith("author="):
+            out["author"] = part[7:].strip()
+    return out if out else None
+
+
 def compute_score(findings: List[dict]) -> int:
     score = 100
     for f in findings:
@@ -159,15 +185,20 @@ def compute_score(findings: List[dict]) -> int:
 
 
 def decision_integrity_check(
-    timeline: List[dict], claims: List[dict], client
-) -> Tuple[List[dict], int]:
-    """Fetch change docs from ES; add findings for approval gap / out_of_window; return (findings, score)."""
+    timeline: List[dict], claims: List[dict], client, report: Optional[dict] = None
+) -> Tuple[List[dict], int, int]:
+    """Fetch change docs from ES; add findings for approval gap / out_of_window; return (findings, score, penalty_total).
+    If report is provided, use report.timeline and report.decision_integrity_artifacts for evidence_refs and details."""
     findings = []
     score = 100
+    penalty_total = 0
+    report_timeline = (report or {}).get("timeline", [])
+    artifacts = (report or {}).get("decision_integrity_artifacts", [])
+    dep_artifacts = [r for r in artifacts if isinstance(r, str) and r.startswith("DEP-")]
     change_refs = [
         r.get("ref") for r in timeline
-        if r.get("kind") == "change"
-        and r.get("ref")
+        if r.get("ref")
+        and (r.get("kind") == "change")
         and ("Deploy" in (r.get("summary") or "") or "Rollback" in (r.get("summary") or ""))
     ]
     claim_ids_by_ref = {}
@@ -193,17 +224,31 @@ def decision_integrity_check(
             approval_gap = True
         if window == "out_of_window":
             out_of_window = True
-        if approval_gap or out_of_window:
-            findings.append({
-                "finding_type": "policy_compliance_unsupported",
-                "message": "Decision integrity: approvals_observed < approvals_required and/or change executed out of window.",
-                "related_claim_ids": related,
-            })
-            if approval_gap:
-                score -= 25
-            if out_of_window:
-                score -= 15
-    return findings, max(0, score)
+        if not (approval_gap or out_of_window):
+            continue
+        if approval_gap:
+            score -= 25
+            penalty_total += 25
+        if out_of_window:
+            score -= 15
+            penalty_total += 15
+        evidence_refs = [ref] if ref in dep_artifacts else ([ref] if ref.startswith("DEP-") else [])
+        if not evidence_refs and ref.startswith("DEP-"):
+            evidence_refs = [ref]
+        row = next((r for r in report_timeline if (r.get("ref") or "") == ref), None)
+        details = None
+        if row:
+            details = parse_change_summary_suffix(row.get("summary") or "")
+        entry = {
+            "finding_type": "policy_compliance_unsupported",
+            "message": "Decision integrity: approvals_observed < approvals_required and/or change executed out of window.",
+            "related_claim_ids": related,
+            "evidence_refs": evidence_refs,
+        }
+        if details is not None:
+            entry["details"] = details
+        findings.append(entry)
+    return findings, max(0, score), penalty_total
 
 
 def render_markdown(data: dict) -> str:
@@ -216,6 +261,18 @@ def render_markdown(data: dict) -> str:
         "## Decision integrity score",
         str(data.get("decision_integrity_score", 0)),
         "",
+        "## Score breakdown",
+    ]
+    for s in data.get("score_breakdown", []):
+        comp = s.get("component", "")
+        delta = s.get("delta", 0)
+        refs = s.get("evidence_refs", [])
+        if refs:
+            lines.append(f"- {comp}: {delta} (evidence_refs: {', '.join(refs)})")
+        else:
+            lines.append(f"- {comp}: {delta}")
+    lines.extend([
+        "",
         "## Counts",
         f"- Validated claims: {len(data.get('validated_claims', []))}",
         f"- Challenged claims: {len(data.get('challenged_claims', []))}",
@@ -223,7 +280,7 @@ def render_markdown(data: dict) -> str:
         "## Challenged claims",
         "| claim_id | reason | suggested_rewrite |",
         "| --- | --- | --- |",
-    ]
+    ])
     for c in data.get("challenged_claims", []):
         reason = (c.get("reason") or "").replace("|", " ")
         rewrite = (c.get("suggested_rewrite") or "").replace("|", " ").replace("\n", " ")
@@ -233,6 +290,60 @@ def render_markdown(data: dict) -> str:
     for f in data.get("integrity_findings", []):
         lines.append(f"- **{f.get('finding_type', '')}**: {f.get('message', '')}")
     return "\n".join(lines)
+
+
+def run_audit(incident_id: str, report: dict) -> dict:
+    """Run audit logic; return audit_data dict (no file I/O). Requires ES and ESQL_PATH for timeline."""
+    claims = report.get("claims", [])
+    if not claims:
+        raise ValueError("No claims in report")
+    if not ESQL_PATH.exists():
+        raise FileNotFoundError(f"ES|QL file not found: {ESQL_PATH}")
+    timeline = fetch_timeline(incident_id)
+    ref_set = {r.get("ref") for r in timeline if r.get("ref")}
+    ref_set_size = len(ref_set)
+    validated, challenged, findings = audit_claims(claims, ref_set)
+    client = get_client()
+    di_findings, decision_integrity_score, decision_integrity_penalty = decision_integrity_check(
+        timeline, claims, client, report
+    )
+    findings.extend(di_findings)
+    overall_integrity_score = compute_score(findings)
+    all_claims_adj = [c.get("confidence_adjusted", 0) for c in validated] + [
+        c.get("confidence_adjusted", 0) for c in challenged
+    ]
+    all_claims_orig = [c.get("confidence_original", 0) for c in validated] + [
+        c.get("confidence_original", 0) for c in challenged
+    ]
+    n = len(all_claims_adj)
+    overall_confidence_adjustment = (
+        (sum(all_claims_adj) - sum(all_claims_orig)) / n if n else 0.0
+    )
+    report_id = report.get("report_id") or f"REPORT-{incident_id}-v1"
+    audited_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    di_evidence_refs = []
+    for f in di_findings:
+        di_evidence_refs.extend(f.get("evidence_refs") or [])
+    di_evidence_refs = list(dict.fromkeys(di_evidence_refs))
+    confidence_delta = overall_integrity_score - 100 + decision_integrity_penalty
+    score_breakdown = [
+        {"component": "base", "delta": 100},
+        {"component": "decision_integrity_penalty", "delta": -decision_integrity_penalty, "evidence_refs": di_evidence_refs},
+        {"component": "confidence_adjustment", "delta": confidence_delta},
+    ]
+    return {
+        "incident_id": incident_id,
+        "audited_at": audited_at,
+        "report_id": report_id,
+        "ref_set_size": ref_set_size,
+        "validated_claims": validated,
+        "challenged_claims": challenged,
+        "integrity_findings": findings,
+        "overall_integrity_score": overall_integrity_score,
+        "decision_integrity_score": decision_integrity_score,
+        "score_breakdown": score_breakdown,
+        "overall_confidence_adjustment": round(overall_confidence_adjustment, 4),
+    }
 
 
 def main() -> None:
@@ -250,49 +361,7 @@ def main() -> None:
         sys.exit(1)
 
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    claims = report.get("claims", [])
-    if not claims:
-        print("No claims in report.", file=sys.stderr)
-        sys.exit(1)
-
-    if not ESQL_PATH.exists():
-        print(f"ES|QL file not found: {ESQL_PATH}", file=sys.stderr)
-        sys.exit(1)
-
-    timeline = fetch_timeline(incident_id)
-    ref_set = {r.get("ref") for r in timeline if r.get("ref")}
-    ref_set_size = len(ref_set)
-
-    validated, challenged, findings = audit_claims(claims, ref_set)
-    client = get_client()
-    di_findings, decision_integrity_score = decision_integrity_check(timeline, claims, client)
-    findings.extend(di_findings)
-    overall_integrity_score = compute_score(findings)
-    all_claims_adj = [c.get("confidence_adjusted", 0) for c in validated] + [
-        c.get("confidence_adjusted", 0) for c in challenged
-    ]
-    all_claims_orig = [c.get("confidence_original", 0) for c in validated] + [
-        c.get("confidence_original", 0) for c in challenged
-    ]
-    n = len(all_claims_adj)
-    overall_confidence_adjustment = (
-        (sum(all_claims_adj) - sum(all_claims_orig)) / n if n else 0.0
-    )
-    report_id = report.get("report_id") or f"REPORT-{incident_id}-v1"
-    audited_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    audit_data = {
-        "incident_id": incident_id,
-        "audited_at": audited_at,
-        "report_id": report_id,
-        "ref_set_size": ref_set_size,
-        "validated_claims": validated,
-        "challenged_claims": challenged,
-        "integrity_findings": findings,
-        "overall_integrity_score": overall_integrity_score,
-        "decision_integrity_score": decision_integrity_score,
-        "overall_confidence_adjustment": round(overall_confidence_adjustment, 4),
-    }
+    audit_data = run_audit(incident_id, report)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     json_path = OUT_DIR / f"audit_{incident_id}.json"
@@ -313,13 +382,16 @@ def main() -> None:
             body = existing.get("_source", {})
         except Exception:
             body = {}
+        validated = audit_data["validated_claims"]
+        challenged = audit_data["challenged_claims"]
+        findings = audit_data["integrity_findings"]
         adj_confidences = [c.get("confidence_adjusted", 0) for c in validated] + [
             c.get("confidence_adjusted", 0) for c in challenged
         ]
         confidence_score = sum(adj_confidences) / len(adj_confidences) if adj_confidences else 0.0
         body["audit"] = {
-            "audited_at": audited_at,
-            "overall_integrity_score": overall_integrity_score,
+            "audited_at": audit_data["audited_at"],
+            "overall_integrity_score": audit_data["overall_integrity_score"],
             "challenged_claims_count": len(challenged),
             "findings": findings,
         }

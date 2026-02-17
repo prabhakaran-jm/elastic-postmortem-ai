@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from es_client import get_client
-from narrator_runner import fetch_timeline, enrich_change_summaries
+from narrator_runner import fetch_timeline, enrich_change_summaries, decision_integrity_artifacts_from_timeline
 
 
 def _test_enrich_no_crash_on_missing_or_weird_fields() -> None:
@@ -72,6 +72,12 @@ def main() -> None:
         print(f"FAIL: DEP-7781 summary missing 'author=ops-alice': {summary!r}", file=sys.stderr)
         sys.exit(1)
     print("DEP-7781 summary OK:", summary)
+
+    artifacts = decision_integrity_artifacts_from_timeline(timeline)
+    if artifacts != ["DEP-7781", "RB-7781"]:
+        print(f"FAIL: decision_integrity_artifacts for INC-1042 should be [\"DEP-7781\", \"RB-7781\"], got {artifacts!r}", file=sys.stderr)
+        sys.exit(1)
+    print("decision_integrity_artifacts OK:", artifacts)
     print("TIMELINE_GOVERNANCE_OK")
 
 

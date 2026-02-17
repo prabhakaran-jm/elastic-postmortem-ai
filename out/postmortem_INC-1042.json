@@ -1,6 +1,6 @@
 {
   "incident_id": "INC-1042",
-  "generated_at": "2026-02-17T21:37:59Z",
+  "generated_at": "2026-02-17T21:43:29Z",
   "time_window": {
     "start": "2026-02-10T09:58:00.000Z",
     "end": "2026-02-10T10:29:00.000Z"
@@ -84,17 +84,17 @@
     },
     {
       "ts": "2026-02-10T10:04:00.000Z",
-      "kind": "alert",
-      "service": "monitoring",
-      "ref": "ALT-5XX-1042",
-      "summary": "[ALERT] 5xx rate 12% on api-gateway"
-    },
-    {
-      "ts": "2026-02-10T10:04:00.000Z",
       "kind": "chat",
       "service": "communication",
       "ref": "CHAT-7781-5",
       "summary": "[CHAT] Acknowledged \u2014 investigating CPU and 5xx alerts."
+    },
+    {
+      "ts": "2026-02-10T10:04:00.000Z",
+      "kind": "alert",
+      "service": "monitoring",
+      "ref": "ALT-5XX-1042",
+      "summary": "[ALERT] 5xx rate 12% on api-gateway"
     },
     {
       "ts": "2026-02-10T10:04:10.000Z",
@@ -126,17 +126,17 @@
     },
     {
       "ts": "2026-02-10T10:27:00.000Z",
-      "kind": "change",
-      "service": "ci",
-      "ref": "RB-7781",
-      "summary": "[CHANGE] Rollback api-gateway to v2.13.2"
-    },
-    {
-      "ts": "2026-02-10T10:27:00.000Z",
       "kind": "chat",
       "service": "communication",
       "ref": "CHAT-7781-6",
       "summary": "[CHAT] Initiating rollback DEP-7781."
+    },
+    {
+      "ts": "2026-02-10T10:27:00.000Z",
+      "kind": "change",
+      "service": "ci",
+      "ref": "RB-7781",
+      "summary": "[CHANGE] Rollback api-gateway to v2.13.2"
     },
     {
       "ts": "2026-02-10T10:29:00.000Z",
@@ -190,7 +190,7 @@
     },
     {
       "claim_id": "CLM-005",
-      "statement": "Rollback was initiated and completed.",
+      "statement": "Rollback was initiated.",
       "evidence_refs": [
         "RB-7781",
         "CHAT-7781-6"

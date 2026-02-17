@@ -96,6 +96,20 @@ Runs in **mock mode** (deterministic from timeline) unless `OPENAI_API_KEY` is s
 
 ---
 
+## Verification
+
+From the project root (with `venv` activated and data loaded):
+
+```bash
+python scripts/verify_timeline_governance.py
+python scripts/verify_auditor_day4.py
+```
+
+- **verify_timeline_governance.py** — Asserts DEP-7781 timeline summary contains approvals 1/2, window=out_of_window, author=ops-alice, and `decision_integrity_artifacts == ["DEP-7781", "RB-7781"]`.
+- **verify_auditor_day4.py** — Asserts the auditor produces an evidence-linked decision integrity finding for INC-1042 (policy_compliance_unsupported with evidence_refs and details, score_breakdown).
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

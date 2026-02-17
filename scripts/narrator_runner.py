@@ -83,18 +83,25 @@ def enrich_change_summaries(timeline: List[dict], client) -> None:
             row["summary"] = (row.get("summary") or "") + " (" + ", ".join(parts) + ")"
 
 
+def _artifact_sort_key(ref: str) -> tuple:
+    """Order: DEP-* first, RB-* second, others last; within group lexicographic."""
+    if ref.startswith("DEP-"):
+        return (0, ref)
+    if ref.startswith("RB-"):
+        return (1, ref)
+    return (2, ref)
+
+
 def decision_integrity_artifacts_from_timeline(timeline: List[dict]) -> List[str]:
-    """Return unique DEP-* and RB-* refs from timeline in timeline order. No invented refs."""
+    """Return unique DEP-* and RB-* refs from timeline, sorted: DEP-* first, RB-* second, others last; within group lexicographic. No invented refs."""
     seen = set()
-    out = []
     for row in timeline:
         ref = (row.get("ref") or "").strip()
-        if not ref or ref in seen:
+        if not ref:
             continue
         if ref.startswith("DEP-") or ref.startswith("RB-"):
             seen.add(ref)
-            out.append(ref)
-    return out
+    return sorted(seen, key=_artifact_sort_key)
 
 
 def _parse_ts(ts: str) -> datetime | None:
@@ -137,6 +144,12 @@ def run_mock_narrator(incident_id: str, timeline: list[dict], start_ts: str, end
     rollback_refs = only_valid([r["ref"] for r in timeline if r.get("ref") in rollback_candidates])
     # Preserve order: RB-7781, CHAT-7781-6, then E-107/E-108
     rollback_refs = [x for x in rollback_candidates if x in rollback_refs]
+    # Completion evidence: summary contains "Rollback complete" or ref E-108/E-109
+    has_rollback_completion = any(
+        "Rollback complete" in (r.get("summary") or "")
+        or (r.get("ref") or "") in ("E-108", "E-109")
+        for r in timeline
+    )
     alert_refs = only_valid([r["ref"] for r in timeline if r.get("kind") == "alert"])
     firing_alerts = only_valid([r["ref"] for r in timeline if r.get("kind") == "alert" and "Resolved" not in (r.get("summary") or "")])
     resolved_alerts = only_valid([r["ref"] for r in timeline if r.get("kind") == "alert" and "Resolved" in (r.get("summary") or "")])
@@ -159,7 +172,7 @@ def run_mock_narrator(incident_id: str, timeline: list[dict], start_ts: str, end
         {"claim_id": "CLM-002", "statement": "Alerts fired during the incident.", "evidence_refs": firing_alerts[:2] or alert_refs[:2] or refs[:1], "confidence": 0.9},
         {"claim_id": "CLM-003", "statement": "Error logs indicated 5xx and circuit issues.", "evidence_refs": error_log_refs[:] or refs[:1], "confidence": 0.85},
         {"claim_id": "CLM-004", "statement": "On-call acknowledged and investigated.", "evidence_refs": oncall_refs[:] or refs[:1], "confidence": 0.82},
-        {"claim_id": "CLM-005", "statement": "Rollback was initiated and completed.", "evidence_refs": rollback_refs[:] or refs[:1], "confidence": 0.87},
+        {"claim_id": "CLM-005", "statement": "Rollback was initiated and completed." if has_rollback_completion else "Rollback was initiated.", "evidence_refs": rollback_refs[:] or refs[:1], "confidence": 0.87},
         {"claim_id": "CLM-006", "statement": "Alerts resolved and service recovered.", "evidence_refs": resolved_alerts[:2] or alert_refs[-2:] or refs[-1:], "confidence": 0.85},
     ]
     for c in claims:
