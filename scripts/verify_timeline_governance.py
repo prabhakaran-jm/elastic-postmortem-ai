@@ -6,8 +6,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from context_contract import load_incident_context
 from es_client import get_client
-from narrator_runner import fetch_timeline, enrich_change_summaries, decision_integrity_artifacts_from_timeline
+from narrator_runner import enrich_change_summaries, decision_integrity_artifacts_from_timeline
 
 
 def _test_enrich_no_crash_on_missing_or_weird_fields() -> None:
@@ -55,7 +56,8 @@ def _test_enrich_no_crash_on_missing_or_weird_fields() -> None:
 def main() -> None:
     _test_enrich_no_crash_on_missing_or_weird_fields()
 
-    timeline = fetch_timeline("INC-1042")
+    context = load_incident_context(get_client(), "INC-1042")
+    timeline = context["timeline"]
     enrich_change_summaries(timeline, get_client())
     row = next((r for r in timeline if r.get("ref") == "DEP-7781"), None)
     if not row:

@@ -10,12 +10,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from context_contract import load_incident_context
 from es_client import get_client, index_name
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-ESQL_PATH = REPO_ROOT / "tools" / "get_incident_context.esql"
 OUT_DIR = REPO_ROOT / "out"
 SCHEMA_PATH = REPO_ROOT / "docs" / "auditor_output_schema.json"
+ESQL_PATH = REPO_ROOT / "tools" / "get_incident_context.esql"
 
 
 def load_schema() -> dict:
@@ -28,37 +29,6 @@ OVERSTRONG_PATTERN = re.compile(
 POLICY_PATTERN = re.compile(
     r"\b(approval process|followed approvals|in change window)\b", re.IGNORECASE
 )
-
-
-def load_esql_query(incident_id: str) -> str:
-    text = ESQL_PATH.read_text(encoding="utf-8")
-    lines = [line for line in text.splitlines() if line.strip() and not line.strip().startswith("//")]
-    return "\n".join(lines).replace("{{INCIDENT_ID}}", incident_id)
-
-
-def fetch_timeline(incident_id: str) -> List[dict]:
-    client = get_client()
-    query = load_esql_query(incident_id)
-    resp = client.esql.query(query=query)
-    body = getattr(resp, "body", resp) if not isinstance(resp, dict) else resp
-    if isinstance(body, dict) and "body" in body and "columns" not in body:
-        body = body["body"]
-    columns = body.get("columns", [])
-    values = body.get("values", [])
-    col_names = [c.get("name", "") for c in columns]
-    want = ["ts", "kind", "service", "ref", "summary"]
-    indices = [col_names.index(w) if w in col_names else None for w in want]
-    rows = []
-    for row in values:
-        cells = []
-        for i in indices:
-            if i is not None and i < len(row):
-                v = row[i]
-                cells.append(v if v is not None else "")
-            else:
-                cells.append("")
-        rows.append(dict(zip(want, cells)))
-    return rows
 
 
 def weaken_statement(statement: str) -> str:
@@ -305,11 +275,12 @@ def run_audit(incident_id: str, report: dict) -> dict:
         raise ValueError("No claims in report")
     if not ESQL_PATH.exists():
         raise FileNotFoundError(f"ES|QL file not found: {ESQL_PATH}")
-    timeline = fetch_timeline(incident_id)
-    ref_set = {r.get("ref") for r in timeline if r.get("ref")}
+    client = get_client()
+    context = load_incident_context(client, incident_id)
+    timeline = context["timeline"]
+    ref_set = set(context["ref_set"])
     ref_set_size = len(ref_set)
     validated, challenged, findings = audit_claims(claims, ref_set)
-    client = get_client()
     di_findings, decision_integrity_score, decision_integrity_penalty = decision_integrity_check(
         timeline, claims, client, report
     )
@@ -353,22 +324,33 @@ def run_audit(incident_id: str, report: dict) -> dict:
     }
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Run Auditor: validate report claims against timeline.")
-    parser.add_argument("--incident", required=True, help="Incident ID (e.g. INC-1042)")
-    parser.add_argument("--report", default=None, help="Path to narrator JSON report")
-    parser.add_argument("--store", action="store_true", help="Upsert audit into postmortem_reports index")
-    parser.add_argument("--exec", action="store_true", help="Executive demo mode")
-    args = parser.parse_args()
-    incident_id = args.incident
-    report_path = Path(args.report) if args.report else OUT_DIR / f"postmortem_{incident_id}.json"
+def _load_report(incident_id: str, report_arg: Optional[str]) -> dict:
+    """Load narrator report from stdin (if not tty), --report path, or default out/postmortem_<id>.json."""
+    if not sys.stdin.isatty():
+        report = json.loads(sys.stdin.read())
+        return report
+    if report_arg:
+        report_path = Path(report_arg)
+    else:
+        report_path = OUT_DIR / f"postmortem_{incident_id}.json"
     if not report_path.is_absolute():
         report_path = REPO_ROOT / report_path
     if not report_path.exists():
         print(f"Report not found: {report_path}", file=sys.stderr)
         sys.exit(1)
+    return json.loads(report_path.read_text(encoding="utf-8"))
 
-    report = json.loads(report_path.read_text(encoding="utf-8"))
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run Auditor: validate report claims against timeline.")
+    parser.add_argument("--incident", required=True, help="Incident ID (e.g. INC-1042)")
+    parser.add_argument("--report", default=None, help="Path to narrator JSON report (default: out/postmortem_<incident>.json)")
+    parser.add_argument("--store", action="store_true", help="Upsert audit into postmortem_reports index")
+    parser.add_argument("--exec", action="store_true", help="Executive demo mode")
+    args = parser.parse_args()
+    incident_id = args.incident
+
+    report = _load_report(incident_id, args.report)
     audit_data = run_audit(incident_id, report)
 
     # Strict schema enforcement for demo reliability
@@ -431,30 +413,10 @@ def main() -> None:
         print("INTEGRITY STATUS: AT RISK")
 
     if args.store:
-        idx = index_name("postmortem_reports")
-        doc_id = f"REPORT-{incident_id}-v1"
         client = get_client()
-        try:
-            existing = client.get(index=idx, id=doc_id)
-            body = existing.get("_source", {})
-        except Exception:
-            body = {}
-        validated = audit_data["validated_claims"]
-        challenged = audit_data["challenged_claims"]
-        findings = audit_data["integrity_findings"]
-        adj_confidences = [c.get("confidence_adjusted", 0) for c in validated] + [
-            c.get("confidence_adjusted", 0) for c in challenged
-        ]
-        confidence_score = sum(adj_confidences) / len(adj_confidences) if adj_confidences else 0.0
-        body["audit"] = {
-            "audited_at": audit_data["audited_at"],
-            "overall_integrity_score": audit_data["overall_integrity_score"],
-            "challenged_claims_count": len(challenged),
-            "findings": findings,
-        }
-        body["confidence_score"] = round(confidence_score, 4)
-        client.index(index=idx, id=doc_id, document=body)
-        print("STORED_OK")
+        from storage import store_artifact
+        stored_id = store_artifact(client, incident_id, "audit_report", audit_data)
+        print("STORED_OK", stored_id)
 
 
 if __name__ == "__main__":

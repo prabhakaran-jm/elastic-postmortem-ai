@@ -11,44 +11,11 @@ from typing import List
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from context_contract import load_incident_context
 from es_client import get_client, index_name
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-ESQL_PATH = REPO_ROOT / "tools" / "get_incident_context.esql"
 OUT_DIR = REPO_ROOT / "out"
-
-
-def load_esql_query(incident_id: str) -> str:
-    """Load ES|QL file, strip comments, replace {{INCIDENT_ID}}."""
-    text = ESQL_PATH.read_text(encoding="utf-8")
-    lines = [line for line in text.splitlines() if line.strip() and not line.strip().startswith("//")]
-    return "\n".join(lines).replace("{{INCIDENT_ID}}", incident_id)
-
-
-def fetch_timeline(incident_id: str) -> List[dict]:
-    """Run ES|QL and return list of { ts, kind, service, ref, summary }."""
-    client = get_client()
-    query = load_esql_query(incident_id)
-    resp = client.esql.query(query=query)
-    body = getattr(resp, "body", resp) if not isinstance(resp, dict) else resp
-    if isinstance(body, dict) and "body" in body and "columns" not in body:
-        body = body["body"]
-    columns = body.get("columns", [])
-    values = body.get("values", [])
-    col_names = [c.get("name", "") for c in columns]
-    want = ["ts", "kind", "service", "ref", "summary"]
-    indices = [col_names.index(w) if w in col_names else None for w in want]
-    rows = []
-    for row in values:
-        cells = []
-        for i in indices:
-            if i is not None and i < len(row):
-                v = row[i]
-                cells.append(v if v is not None else "")
-            else:
-                cells.append("")
-        rows.append(dict(zip(want, cells)))
-    return rows
 
 
 def enrich_change_summaries(timeline: List[dict], client) -> None:
@@ -325,18 +292,15 @@ def main() -> None:
     args = parser.parse_args()
     incident_id = args.incident
 
-    if not ESQL_PATH.exists():
-        print(f"ES|QL file not found: {ESQL_PATH}", file=sys.stderr)
-        sys.exit(1)
-
-    timeline = fetch_timeline(incident_id)
+    client = get_client()
+    context = load_incident_context(client, incident_id)
+    timeline = context["timeline"]
     if not timeline:
         print("No timeline rows returned.", file=sys.stderr)
         sys.exit(1)
-    enrich_change_summaries(timeline, get_client())
-
-    start_ts = timeline[0].get("ts", "")
-    end_ts = timeline[-1].get("ts", "")
+    enrich_change_summaries(timeline, client)
+    start_ts = context["time_window"]["start"]
+    end_ts = context["time_window"]["end"]
 
     data = run_openai_narrator(incident_id, start_ts, end_ts, timeline)
     if data is None:
@@ -361,31 +325,9 @@ def main() -> None:
     print(md_path)
 
     if args.store:
-        claims_list = data.get("claims", [])
-        confidences = [c.get("confidence") for c in claims_list if isinstance(c.get("confidence"), (int, float))]
-        confidence_score = sum(confidences) / len(confidences) if confidences else 0.0
-        report_id = f"REPORT-{incident_id}-v1"
-        created_at = data.get("generated_at") or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        doc = {
-            "report_id": report_id,
-            "incident_id": incident_id,
-            "version": 1,
-            "created_at": created_at,
-            "status": "draft",
-            "confidence_score": round(confidence_score, 4),
-            "timeline": data.get("timeline", []),
-            "claims": data.get("claims", []),
-            "suspected_root_causes": data.get("suspected_root_causes", []),
-            "decision_integrity_hints": data.get("decision_integrity_hints", []),
-            "followups": data.get("followups", []),
-        }
-        client = get_client()
-        client.index(
-            index=index_name("postmortem_reports"),
-            id=report_id,
-            document=doc,
-        )
-        print("STORED_OK")
+        from storage import store_artifact
+        stored_id = store_artifact(client, incident_id, "narrator_report", data)
+        print("STORED_OK", stored_id)
 
 
 if __name__ == "__main__":

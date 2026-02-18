@@ -96,6 +96,28 @@ Runs in **mock mode** (deterministic from timeline) unless `OPENAI_API_KEY` is s
 
 ---
 
+## Day 5: Elastic-native E2E Loop
+
+One-command demo: narrator and auditor in-process, then executive summary.
+
+```bash
+python scripts/demo_day5_e2e.py --incident INC-1042
+```
+
+**Outputs:** `out/postmortem_<incident_id>.json` and `out/audit_<incident_id>.json`, plus an Executive Summary to the console.
+
+**Optional storage:** Use `--store` on the individual scripts to persist to `pmai-postmortem_reports`:
+
+- `python scripts/narrator_runner.py --incident INC-1042 --store`
+- `python scripts/auditor_runner.py --incident INC-1042 --store`
+
+**Flow:**
+
+- **Narrator** → Evidence-linked postmortem (timeline, claims, decision_integrity_artifacts).
+- **Auditor** → Validates evidence refs, flags governance violations, and produces integrity + decision-integrity scores.
+
+---
+
 ## Verification
 
 From the project root (with `venv` activated and data loaded):

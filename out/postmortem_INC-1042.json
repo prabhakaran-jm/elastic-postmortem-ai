@@ -1,6 +1,6 @@
 {
   "incident_id": "INC-1042",
-  "generated_at": "2026-02-17T21:43:29Z",
+  "generated_at": "2026-02-18T09:32:59Z",
   "time_window": {
     "start": "2026-02-10T09:58:00.000Z",
     "end": "2026-02-10T10:29:00.000Z"
@@ -28,6 +28,13 @@
     },
     {
       "ts": "2026-02-10T10:00:00.000Z",
+      "kind": "change",
+      "service": "ci",
+      "ref": "DEP-7781",
+      "summary": "[CHANGE] Deploy api-gateway v2.14.0 to prod (approvals 1/2, window=out_of_window, author=ops-alice)"
+    },
+    {
+      "ts": "2026-02-10T10:00:00.000Z",
       "kind": "chat",
       "service": "communication",
       "ref": "CHAT-7781-3",
@@ -39,13 +46,6 @@
       "service": "communication",
       "ref": "CHAT-7781-4",
       "summary": "[CHAT] Starting deploy DEP-7781 now."
-    },
-    {
-      "ts": "2026-02-10T10:00:00.000Z",
-      "kind": "change",
-      "service": "ci",
-      "ref": "DEP-7781",
-      "summary": "[CHANGE] Deploy api-gateway v2.14.0 to prod (approvals 1/2, window=out_of_window, author=ops-alice)"
     },
     {
       "ts": "2026-02-10T10:02:00.000Z",
@@ -126,17 +126,17 @@
     },
     {
       "ts": "2026-02-10T10:27:00.000Z",
-      "kind": "chat",
-      "service": "communication",
-      "ref": "CHAT-7781-6",
-      "summary": "[CHAT] Initiating rollback DEP-7781."
-    },
-    {
-      "ts": "2026-02-10T10:27:00.000Z",
       "kind": "change",
       "service": "ci",
       "ref": "RB-7781",
       "summary": "[CHANGE] Rollback api-gateway to v2.13.2"
+    },
+    {
+      "ts": "2026-02-10T10:27:00.000Z",
+      "kind": "chat",
+      "service": "communication",
+      "ref": "CHAT-7781-6",
+      "summary": "[CHAT] Initiating rollback DEP-7781."
     },
     {
       "ts": "2026-02-10T10:29:00.000Z",
