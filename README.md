@@ -21,7 +21,7 @@ make demo           # narrator → auditor for INC-1042
 make ui             # Streamlit app
 ```
 
-**Windows (PowerShell):** same flow with `python -m venv venv`, `.\venv\Scripts\Activate.ps1`, `pip install -r requirements.txt`, then `python scripts/create_indices.py --recreate`, `python scripts/bulk_load.py`, `python scripts/run_e2e.py --incident INC-1042`, `streamlit run app.py`.
+git **Windows (PowerShell):** same flow with `python -m venv venv`, `.\venv\Scripts\Activate.ps1`, `pip install -r requirements.txt`, then `python scripts/create_indices.py --recreate`, `python scripts/bulk_load.py`, `python scripts/run_e2e.py --incident INC-1042`, `streamlit run app.py`.
 
 ---
 
