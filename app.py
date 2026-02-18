@@ -7,16 +7,21 @@ import streamlit as st
 REPO_ROOT = Path(__file__).resolve().parent
 
 
-def _safe_get_client():
+@st.cache_resource
+def _get_cached_client():
     from scripts.es_client import get_client
+    return get_client()
 
+
+def _safe_get_client():
     try:
-        return get_client()
+        return _get_cached_client()
     except Exception as e:
         st.error(f"Elasticsearch client error: {e}")
         return None
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def _elasticsearch_connected() -> bool:
     """Inexpensive ping to Elasticsearch; used for health indicator only."""
     try:
@@ -51,7 +56,9 @@ def _compute_causality_strength(audit: dict) -> int:
 
 st.set_page_config(page_title="Postmortem AI", layout="wide")
 st.title("Postmortem AI: Incident Narrator + Integrity Auditor")
-st.caption(f"Connected to Elasticsearch: {'Yes' if _elasticsearch_connected() else 'No'}")
+if "es_status" not in st.session_state:
+    st.session_state["es_status"] = _elasticsearch_connected()
+st.caption(f"Connected to Elasticsearch: {'Yes' if st.session_state['es_status'] else 'No'}")
 
 with st.expander("Demo Notes", expanded=False):
     st.markdown(
@@ -73,25 +80,43 @@ if "audit" not in st.session_state:
     st.session_state["audit"] = None
 if "timeline" not in st.session_state:
     st.session_state["timeline"] = None
+if "stored_arts" not in st.session_state:
+    st.session_state["stored_arts"] = {}  # incident_id -> list of artifact dicts
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _cached_incident_context(incident_id: str) -> dict:
+    from scripts.context_contract import load_incident_context
+    client = _get_cached_client()
+    return load_incident_context(client, incident_id)
 
 
 def _load_timeline():
-    client = _safe_get_client()
-    if not client:
-        return
-    from scripts.context_contract import load_incident_context
+    try:
+        ctx = _cached_incident_context(incident_id)
+        st.session_state["timeline"] = ctx.get("timeline", [])
+    except Exception as e:
+        st.error(f"Failed to load timeline: {e}")
 
-    ctx = load_incident_context(client, incident_id)
-    st.session_state["timeline"] = ctx.get("timeline", [])
+
+@st.cache_data(ttl=300, show_spinner=True)
+def _run_narrator_cached(incident_id: str) -> dict:
+    from scripts.narrator_runner import run_narrator
+    return run_narrator(incident_id)
+
+
+@st.cache_data(ttl=300, show_spinner=True)
+def _run_audit_cached(incident_id: str, narrator_report_json_str: str) -> dict:
+    from scripts.auditor_runner import run_audit
+    report = json.loads(narrator_report_json_str)
+    return run_audit(incident_id, report)
 
 
 def _generate_postmortem(*, store: bool = False):
     client = _safe_get_client()
     if not client:
         return
-    from scripts.narrator_runner import run_narrator
-
-    report = run_narrator(incident_id)
+    report = _run_narrator_cached(incident_id)
     st.session_state["narrator"] = report
     st.session_state["audit"] = None
     if store and report:
@@ -104,8 +129,6 @@ def _run_audit(*, store: bool = False):
     client = _safe_get_client()
     if not client:
         return
-    from scripts.auditor_runner import run_audit
-
     report = st.session_state.get("narrator")
     if not report:
         out_path = REPO_ROOT / "out" / f"postmortem_{incident_id}.json"
@@ -113,12 +136,10 @@ def _run_audit(*, store: bool = False):
             report = json.loads(out_path.read_text(encoding="utf-8"))
             st.session_state["narrator"] = report
         else:
-            from scripts.narrator_runner import run_narrator
-
-            report = run_narrator(incident_id)
+            report = _run_narrator_cached(incident_id)
             st.session_state["narrator"] = report
 
-    audit = run_audit(incident_id, report)
+    audit = _run_audit_cached(incident_id, json.dumps(report, sort_keys=True))
     st.session_state["audit"] = audit
     if store and audit:
         from scripts.storage import store_artifact
@@ -129,16 +150,20 @@ def _run_audit(*, store: bool = False):
 with col1:
     if st.button("Generate Post-mortem", use_container_width=True):
         _load_timeline()
-        _generate_postmortem(store=store_to_es)
+        with st.spinner("Running narrator..."):
+            _generate_postmortem(store=store_to_es)
 with col2:
     if st.button("Run Audit", use_container_width=True):
         _load_timeline()
-        _run_audit(store=store_to_es)
+        with st.spinner("Running auditor..."):
+            _run_audit(store=store_to_es)
 with col3:
     if st.button("Run E2E (both)", use_container_width=True):
         _load_timeline()
-        _generate_postmortem(store=store_to_es)
-        _run_audit(store=store_to_es)
+        with st.spinner("Running narrator..."):
+            _generate_postmortem(store=store_to_es)
+        with st.spinner("Running auditor..."):
+            _run_audit(store=store_to_es)
 
 
 audit = st.session_state.get("audit") or {}
@@ -160,10 +185,12 @@ tab_timeline, tab_pm, tab_audit, tab_stored = st.tabs(
 )
 
 with tab_timeline:
-    if st.session_state.get("timeline") is None:
+    if st.button("Load Timeline"):
         _load_timeline()
     timeline = st.session_state.get("timeline") or []
-    st.dataframe(timeline, use_container_width=True)
+    show_full = st.checkbox("Show full timeline", value=False)
+    rows = timeline[-20:] if not show_full else timeline
+    st.dataframe(rows, use_container_width=True)
 
 with tab_pm:
     narrator = st.session_state.get("narrator")
@@ -184,7 +211,15 @@ with tab_stored:
         st.stop()
     from scripts.storage import get_artifact, list_artifacts
 
-    arts = list_artifacts(client, incident_id)
+    if st.button("Refresh stored artifacts"):
+        arts = list_artifacts(client, incident_id)
+        st.session_state["stored_arts"][incident_id] = arts
+    elif incident_id not in st.session_state["stored_arts"]:
+        arts = list_artifacts(client, incident_id)
+        st.session_state["stored_arts"][incident_id] = arts
+    else:
+        arts = st.session_state["stored_arts"][incident_id]
+
     if not arts:
         st.info("No stored artifacts yet. Run with --store.")
     else:

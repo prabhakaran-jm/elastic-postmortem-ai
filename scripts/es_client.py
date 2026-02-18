@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Elasticsearch client configured for Serverless."""
+import functools
 import os
 
 from dotenv import load_dotenv
@@ -11,6 +12,18 @@ ES_URL = os.getenv("ES_URL")
 ES_API_KEY = os.getenv("ES_API_KEY")
 ES_VERIFY_TLS = os.getenv("ES_VERIFY_TLS", "true").lower() in ("true", "1", "yes")
 ES_INDEX_PREFIX = os.getenv("ES_INDEX_PREFIX", "").strip()
+
+
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
+ES_REQUEST_TIMEOUT = _int_env("ES_REQUEST_TIMEOUT", 10)
+ES_MAX_RETRIES = _int_env("ES_MAX_RETRIES", 2)
+ES_RETRY_ON_TIMEOUT = os.getenv("ES_RETRY_ON_TIMEOUT", "true").lower() in ("true", "1", "yes")
 
 
 def require_env() -> None:
@@ -26,6 +39,7 @@ def require_env() -> None:
         )
 
 
+@functools.lru_cache(maxsize=1)
 def get_client() -> Elasticsearch:
     """Return an Elasticsearch client for Serverless (api_key auth, verify_certs from ES_VERIFY_TLS)."""
     require_env()
@@ -33,6 +47,9 @@ def get_client() -> Elasticsearch:
         ES_URL,
         api_key=ES_API_KEY,
         verify_certs=ES_VERIFY_TLS,
+        request_timeout=ES_REQUEST_TIMEOUT,
+        max_retries=ES_MAX_RETRIES,
+        retry_on_timeout=ES_RETRY_ON_TIMEOUT,
     )
 
 

@@ -20,8 +20,13 @@
 FROM pmai-logs, pmai-alerts, pmai-changes, pmai-chat_messages, pmai-tickets
   METADATA _index
 | WHERE @timestamp >= "2026-02-10T09:58:00Z" AND @timestamp <= "2026-02-10T10:40:00Z"
-  AND (incident_id IS NULL OR incident_id == "{{INCIDENT_ID}}")
-  AND (_index != "pmai-logs" OR level == "WARN" OR level == "ERROR")
+  AND (
+    (_index == "pmai-logs"           AND incident_id == "{{INCIDENT_ID}}" AND (level == "WARN" OR level == "ERROR"))
+    OR (_index == "pmai-changes"     AND (id == "DEP-{{INCIDENT_NUM}}" OR id == "RB-{{INCIDENT_NUM}}" OR title LIKE "*{{INCIDENT_ID}}*" OR notes LIKE "*{{INCIDENT_ID}}*"))
+    OR (_index == "pmai-alerts"     AND (id LIKE "*{{INCIDENT_NUM}}*" OR title LIKE "*{{INCIDENT_ID}}*" OR message LIKE "*{{INCIDENT_ID}}*"))
+    OR (_index == "pmai-tickets"     AND (title LIKE "*{{INCIDENT_ID}}*" OR description LIKE "*{{INCIDENT_ID}}*"))
+    OR (_index == "pmai-chat_messages" AND (message LIKE "*{{INCIDENT_ID}}*" OR thread_id LIKE "*{{INCIDENT_NUM}}*"))
+  )
 | EVAL
     ts = @timestamp,
     kind = CASE(
