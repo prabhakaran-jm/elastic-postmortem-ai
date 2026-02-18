@@ -15,6 +15,12 @@ from es_client import get_client, index_name
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ESQL_PATH = REPO_ROOT / "tools" / "get_incident_context.esql"
 OUT_DIR = REPO_ROOT / "out"
+SCHEMA_PATH = REPO_ROOT / "docs" / "auditor_output_schema.json"
+
+
+def load_schema() -> dict:
+    """Load JSON Schema from docs/auditor_output_schema.json."""
+    return json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
 OVERSTRONG_PATTERN = re.compile(
     r"\b(confirmed|proves?|root cause|introduced|caused)\b", re.IGNORECASE
@@ -101,7 +107,7 @@ def audit_claims(
                 suggested_rewrite = weaken_statement(statement)
             if POLICY_PATTERN.search(statement):
                 reasons.append("Policy compliance not explicitly supported by timeline.")
-                finding_types.append("policy_compliance_unsupported")
+                finding_types.append("governance_violation_detected")
                 conf_adjusted = min(conf_adjusted, conf_orig - 0.08, 0.88)
                 if not suggested_rewrite:
                     suggested_rewrite = statement + " (Timeline does not explicitly show compliance.)"
@@ -177,7 +183,7 @@ def compute_score(findings: List[dict]) -> int:
             score -= 15
         elif t == "overstrong_causality":
             score -= 8
-        elif t == "policy_compliance_unsupported":
+        elif t == "governance_violation_detected":
             score -= 8
         elif t == "overconfident_claim":
             score -= 5
@@ -240,7 +246,7 @@ def decision_integrity_check(
         if row:
             details = parse_change_summary_suffix(row.get("summary") or "")
         entry = {
-            "finding_type": "policy_compliance_unsupported",
+            "finding_type": "governance_violation_detected",
             "message": "Decision integrity: approvals_observed < approvals_required and/or change executed out of window.",
             "related_claim_ids": related,
             "evidence_refs": evidence_refs,
@@ -326,10 +332,11 @@ def run_audit(incident_id: str, report: dict) -> dict:
         di_evidence_refs.extend(f.get("evidence_refs") or [])
     di_evidence_refs = list(dict.fromkeys(di_evidence_refs))
     confidence_delta = overall_integrity_score - 100 + decision_integrity_penalty
+    # validated_claims_bonus reflects validated coverage and evidence consistency, not model confidence adjustment.
     score_breakdown = [
         {"component": "base", "delta": 100},
         {"component": "decision_integrity_penalty", "delta": -decision_integrity_penalty, "evidence_refs": di_evidence_refs},
-        {"component": "confidence_adjustment", "delta": confidence_delta},
+        {"component": "validated_claims_bonus", "delta": confidence_delta},
     ]
     return {
         "incident_id": incident_id,
@@ -351,6 +358,7 @@ def main() -> None:
     parser.add_argument("--incident", required=True, help="Incident ID (e.g. INC-1042)")
     parser.add_argument("--report", default=None, help="Path to narrator JSON report")
     parser.add_argument("--store", action="store_true", help="Upsert audit into postmortem_reports index")
+    parser.add_argument("--exec", action="store_true", help="Executive demo mode")
     args = parser.parse_args()
     incident_id = args.incident
     report_path = Path(args.report) if args.report else OUT_DIR / f"postmortem_{incident_id}.json"
@@ -363,15 +371,64 @@ def main() -> None:
     report = json.loads(report_path.read_text(encoding="utf-8"))
     audit_data = run_audit(incident_id, report)
 
+    # Strict schema enforcement for demo reliability
+    try:
+        from jsonschema import ValidationError, validate
+        schema = load_schema()
+        validate(instance=audit_data, schema=schema)
+    except ValidationError as e:
+        print("AUDITOR_SCHEMA_VALIDATION_FAILED", file=sys.stderr)
+        print(str(e), file=sys.stderr)
+        sys.exit(1)
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     json_path = OUT_DIR / f"audit_{incident_id}.json"
     md_path = OUT_DIR / f"audit_{incident_id}.md"
     json_path.write_text(json.dumps(audit_data, indent=2), encoding="utf-8")
     md_path.write_text(render_markdown(audit_data), encoding="utf-8")
 
+    confidence_drift = round(
+        sum(c.get("confidence_original", 0) - c.get("confidence_adjusted", 0) for c in audit_data["validated_claims"])
+        + sum(c.get("confidence_original", 0) - c.get("confidence_adjusted", 0) for c in audit_data["challenged_claims"]),
+        4,
+    )
+    has_causality_issue = any(
+        f.get("finding_type") == "overstrong_causality"
+        for f in audit_data["integrity_findings"]
+    )
+    causality_strength = 100 if not has_causality_issue else 70
+
+    if args.exec:
+        audit = audit_data
+        print("\nEXECUTIVE INTEGRITY SUMMARY")
+        print(f"Incident: {audit['incident_id']}")
+        print(f"Integrity Score: {audit['overall_integrity_score']}/100")
+        print(f"Decision Integrity: {audit['decision_integrity_score']}/100")
+        print(f"Confidence Drift: -{confidence_drift}")
+        print(f"Causality Strength: {causality_strength}/100")
+        print(f"Findings: {len(audit['integrity_findings'])}")
+        return
+
     print("AUDITOR_OK")
     print(json_path)
     print(md_path)
+    overall = audit_data["overall_integrity_score"]
+    decision = audit_data["decision_integrity_score"]
+    gov_count = len(audit_data["integrity_findings"])
+    print("========================================")
+    print("POSTMORTEM INTEGRITY AUDIT")
+    print(f"Incident: {incident_id}")
+    print(f"Overall Integrity Score: {overall}/100")
+    print(f"Decision Integrity Score: {decision}/100")
+    print(f"Confidence Drift: -{confidence_drift}")
+    print(f"Governance Findings: {gov_count}")
+    print("========================================")
+    if overall >= 90:
+        print("INTEGRITY STATUS: TRUSTED")
+    elif overall >= 70:
+        print("INTEGRITY STATUS: REVIEW ADVISED")
+    else:
+        print("INTEGRITY STATUS: AT RISK")
 
     if args.store:
         idx = index_name("postmortem_reports")

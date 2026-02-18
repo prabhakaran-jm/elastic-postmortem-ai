@@ -46,11 +46,11 @@ Strict JSON schema for PostMortem AI Integrity Auditor output. Minimal and demo-
 
 | Field | Type |
 |-------|------|
-| `finding_type` | one of: `"missing_evidence_ref"` \| `"overstrong_causality"` \| `"policy_compliance_unsupported"` \| `"overconfident_claim"` |
+| `finding_type` | one of: `"missing_evidence_ref"` \| `"overstrong_causality"` \| `"governance_violation_detected"` \| `"overconfident_claim"` |
 | `message` | string |
 | `related_claim_ids` | array of strings |
-| `evidence_refs` | array of strings (optional); for `policy_compliance_unsupported`, DEP-* refs from narrator `decision_integrity_artifacts`. |
-| `details` | object (optional); for `policy_compliance_unsupported`, parsed from timeline summary suffix: `approvals_observed`, `approvals_required`, `change_window`, `author`. Omitted if parsing fails. |
+| `evidence_refs` | array of strings (optional); for `governance_violation_detected`, DEP-* refs from narrator `decision_integrity_artifacts`. |
+| `details` | object (optional); for `governance_violation_detected`, parsed from timeline summary suffix: `approvals_observed`, `approvals_required`, `change_window`, `author`. Omitted if parsing fails. |
 
 ### score_breakdown[] item
 
@@ -134,7 +134,7 @@ Strict JSON schema for PostMortem AI Integrity Auditor output. Minimal and demo-
         "properties": {
           "finding_type": {
             "type": "string",
-            "enum": ["missing_evidence_ref", "overstrong_causality", "policy_compliance_unsupported", "overconfident_claim"]
+            "enum": ["missing_evidence_ref", "overstrong_causality", "governance_violation_detected", "overconfident_claim"]
           },
           "message": { "type": "string" },
           "related_claim_ids": { "type": "array", "items": { "type": "string" } },
@@ -209,7 +209,7 @@ Strict JSON schema for PostMortem AI Integrity Auditor output. Minimal and demo-
       "related_claim_ids": ["CLM-003"]
     },
     {
-      "finding_type": "policy_compliance_unsupported",
+      "finding_type": "governance_violation_detected",
       "message": "Decision integrity: approvals_observed < approvals_required and/or change executed out of window.",
       "related_claim_ids": ["CLM-001"],
       "evidence_refs": ["DEP-7781"],

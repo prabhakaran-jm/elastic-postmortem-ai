@@ -47,10 +47,10 @@ def main() -> None:
         print(f"FAIL: audit['integrity_findings'] must be a list, got {type(findings).__name__}", file=sys.stderr)
         sys.exit(1)
 
-    # INC-1042 specific: evidence-linked policy_compliance_unsupported
-    policy_findings = [f for f in findings if f.get("finding_type") == "policy_compliance_unsupported"]
+    # INC-1042 specific: evidence-linked governance_violation_detected
+    policy_findings = [f for f in findings if f.get("finding_type") == "governance_violation_detected"]
     if not policy_findings:
-        print("FAIL: INC-1042 must have at least one finding with finding_type == 'policy_compliance_unsupported'", file=sys.stderr)
+        print("FAIL: INC-1042 must have at least one finding with finding_type == 'governance_violation_detected'", file=sys.stderr)
         sys.exit(1)
 
     found_evidence = False
@@ -78,7 +78,7 @@ def main() -> None:
         break
 
     if not found_evidence:
-        print("FAIL: No policy_compliance_unsupported finding contains evidence_refs with 'DEP-7781'", file=sys.stderr)
+        print("FAIL: No governance_violation_detected finding contains evidence_refs with 'DEP-7781'", file=sys.stderr)
         sys.exit(1)
 
     # score_breakdown

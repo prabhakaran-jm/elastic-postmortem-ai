@@ -32,7 +32,7 @@ The output **must** conform to **docs/auditor_output_schema.md**.
 - **incident_id**, **audited_at** (ISO datetime), **report_id**, **ref_set_size** (distinct refs in timeline).
 - **validated_claims[]**: claims where every `evidence_ref` exists in `timeline.ref`; fields: `claim_id`, `statement`, `evidence_refs`, `confidence_original`, `confidence_adjusted`, `notes`.
 - **challenged_claims[]**: claims with missing refs or language too strong; fields: `claim_id`, `statement`, `evidence_refs`, `missing_refs[]`, `reason`, `suggested_rewrite` (no new refs), `confidence_original`, `confidence_adjusted`.
-- **integrity_findings[]**: `finding_type`, `message`, `related_claim_ids[]`; `finding_type` is one of: `missing_evidence_ref`, `overstrong_causality`, `policy_compliance_unsupported`, `overconfident_claim`.
+- **integrity_findings[]**: `finding_type`, `message`, `related_claim_ids[]`; `finding_type` is one of: `missing_evidence_ref`, `overstrong_causality`, `governance_violation_detected`, `overconfident_claim`.
 - **overall_integrity_score** (0–100 integer), **overall_confidence_adjustment** (≤ 0).
 
 ---
@@ -63,7 +63,7 @@ The output **must** conform to **docs/auditor_output_schema.md**.
 ### Rule 3 — Policy compliance unsupported
 
 - If the Narrator claims that approvals or change-window policy was satisfied (or violated) **without** explicit evidence in the timeline (e.g. no change record with `approvals_observed` / `change_window` or no chat/log that states compliance), flag it.
-- Add an **integrity_finding** with `finding_type: "policy_compliance_unsupported"` and the related claim or root-cause id if applicable.
+- Add an **integrity_finding** with `finding_type: "governance_violation_detected"` and the related claim or root-cause id if applicable.
 - Optionally add or move the claim to **challenged_claims** with a `suggested_rewrite` that qualifies the statement (e.g. “Policy compliance cannot be confirmed from timeline evidence”).
 
 ### Rule 4 — Overconfidence

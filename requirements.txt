@@ -1,2 +1,3 @@
 elasticsearch
+jsonschema
 python-dotenv

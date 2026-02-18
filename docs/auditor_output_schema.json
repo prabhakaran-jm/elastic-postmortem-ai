@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuditorOutput",
+  "type": "object",
+  "required": [
+    "incident_id",
+    "audited_at",
+    "report_id",
+    "ref_set_size",
+    "validated_claims",
+    "challenged_claims",
+    "integrity_findings",
+    "overall_integrity_score",
+    "decision_integrity_score",
+    "score_breakdown",
+    "overall_confidence_adjustment"
+  ],
+  "properties": {
+    "incident_id": { "type": "string" },
+    "audited_at": { "type": "string", "format": "date-time" },
+    "report_id": { "type": "string" },
+    "ref_set_size": { "type": "number" },
+    "validated_claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim_id", "statement", "evidence_refs", "confidence_original", "confidence_adjusted", "notes"],
+        "properties": {
+          "claim_id": { "type": "string" },
+          "statement": { "type": "string" },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "confidence_original": { "type": "number" },
+          "confidence_adjusted": { "type": "number" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "challenged_claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim_id", "statement", "evidence_refs", "missing_refs", "reason", "suggested_rewrite", "confidence_original", "confidence_adjusted"],
+        "properties": {
+          "claim_id": { "type": "string" },
+          "statement": { "type": "string" },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "missing_refs": { "type": "array", "items": { "type": "string" } },
+          "reason": { "type": "string" },
+          "suggested_rewrite": { "type": "string" },
+          "confidence_original": { "type": "number" },
+          "confidence_adjusted": { "type": "number" }
+        }
+      }
+    },
+    "integrity_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["finding_type", "message", "related_claim_ids"],
+        "properties": {
+          "finding_type": {
+            "type": "string",
+            "enum": ["missing_evidence_ref", "overstrong_causality", "governance_violation_detected", "overconfident_claim"]
+          },
+          "message": { "type": "string" },
+          "related_claim_ids": { "type": "array", "items": { "type": "string" } },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "details": {
+            "type": "object",
+            "properties": {
+              "approvals_observed": { "type": "integer" },
+              "approvals_required": { "type": "integer" },
+              "change_window": { "type": "string" },
+              "author": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "overall_integrity_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "decision_integrity_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "score_breakdown": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["component", "delta"],
+        "properties": {
+          "component": { "type": "string" },
+          "delta": { "type": "number" },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "overall_confidence_adjustment": { "type": "number", "maximum": 0 }
+  }
+}
