@@ -21,10 +21,10 @@ FROM pmai-logs, pmai-alerts, pmai-changes, pmai-chat_messages, pmai-tickets
   METADATA _index
 | WHERE @timestamp >= "2026-02-10T09:58:00Z" AND @timestamp <= "2026-02-10T10:40:00Z"
   AND (
-    (_index == "pmai-logs"           AND incident_id == "{{INCIDENT_ID}}" AND (level == "WARN" OR level == "ERROR"))
-    OR (_index == "pmai-changes"     AND (id == "DEP-{{INCIDENT_NUM}}" OR id == "RB-{{INCIDENT_NUM}}" OR title LIKE "*{{INCIDENT_ID}}*" OR notes LIKE "*{{INCIDENT_ID}}*"))
-    OR (_index == "pmai-alerts"     AND (id LIKE "*{{INCIDENT_NUM}}*" OR title LIKE "*{{INCIDENT_ID}}*" OR message LIKE "*{{INCIDENT_ID}}*"))
-    OR (_index == "pmai-tickets"     AND (title LIKE "*{{INCIDENT_ID}}*" OR description LIKE "*{{INCIDENT_ID}}*"))
+    (_index == "pmai-logs" AND incident_id == "{{INCIDENT_ID}}" AND (level == "WARN" OR level == "ERROR"))
+    OR (_index == "pmai-changes" AND (id == "DEP-{{INCIDENT_NUM}}" OR id == "RB-{{INCIDENT_NUM}}" OR title LIKE "*{{INCIDENT_ID}}*" OR notes LIKE "*{{INCIDENT_ID}}*"))
+    OR (_index == "pmai-alerts" AND id LIKE "*{{INCIDENT_NUM}}*")
+    OR (_index == "pmai-tickets" AND (title LIKE "*{{INCIDENT_ID}}*" OR description LIKE "*{{INCIDENT_ID}}*"))
     OR (_index == "pmai-chat_messages" AND (message LIKE "*{{INCIDENT_ID}}*" OR thread_id LIKE "*{{INCIDENT_NUM}}*"))
   )
 | EVAL
@@ -38,7 +38,11 @@ FROM pmai-logs, pmai-alerts, pmai-changes, pmai-chat_messages, pmai-tickets
       "other"
     ),
     ref = id,
-    service = CASE(_index == "pmai-chat_messages", "communication", COALESCE(service, source, "")),
+    service = CASE(
+      _index == "pmai-chat_messages", "communication",
+      _index == "pmai-changes", COALESCE(service, "ci"),
+      COALESCE(service, source, "")
+    ),
     summary = CASE(
       _index == "pmai-logs",            CONCAT("[LOG] ", COALESCE(message, "")),
       _index == "pmai-alerts",          CONCAT("[ALERT] ", COALESCE(message, "")),
@@ -48,5 +52,5 @@ FROM pmai-logs, pmai-alerts, pmai-changes, pmai-chat_messages, pmai-tickets
       ""
     )
 | KEEP ts, kind, ref, service, summary
-| SORT ts ASC
+| SORT ts ASC, kind ASC, ref ASC
 | LIMIT 200
