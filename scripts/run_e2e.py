@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E2E demo: run narrator and auditor in-process, write outputs, print executive summary."""
+"""E2E pipeline: run narrator and auditor in-process, write outputs, print executive summary."""
 import argparse
 import json
 import sys
@@ -45,7 +45,7 @@ def _run_audit(incident_id: str, report: dict) -> dict:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="E2E demo: narrator + auditor, then executive summary.")
+    parser = argparse.ArgumentParser(description="E2E pipeline: narrator + auditor, then executive summary.")
     parser.add_argument("--incident", required=True, help="Incident ID (e.g. INC-1042)")
     args = parser.parse_args()
     incident_id = args.incident

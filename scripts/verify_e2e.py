@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify Day 5: narrator + auditor pipeline and output shape for INC-1042."""
+"""Verify E2E pipeline: narrator + auditor output shape for INC-1042."""
 import sys
 from pathlib import Path
 
@@ -9,7 +9,7 @@ INCIDENT_ID = "INC-1042"
 
 
 def main() -> None:
-    from demo_day5_e2e import _run_audit, _run_narrator
+    from run_e2e import _run_audit, _run_narrator
 
     # 1) Run narrator for INC-1042
     data = _run_narrator(INCIDENT_ID)
@@ -61,7 +61,7 @@ def main() -> None:
             print(f"FAIL: governance finding must have evidence_refs containing DEP-7781, got {refs!r}", file=sys.stderr)
             sys.exit(1)
 
-    print("DAY5_OK")
+    print("E2E_OK")
 
 
 if __name__ == "__main__":

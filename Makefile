@@ -17,13 +17,13 @@ indices:
 load:
 	$(VENV_PYTHON) scripts/bulk_load.py
 
-# Run Day 5 E2E demo (narrator + auditor) for INC-1042
+# Run E2E pipeline (narrator + auditor) for INC-1042
 demo:
-	$(VENV_PYTHON) scripts/demo_day5_e2e.py --incident INC-1042
+	$(VENV_PYTHON) scripts/run_e2e.py --incident INC-1042
 
-# Run Day 5 verification (narrator + auditor output shape)
+# Verify E2E pipeline (narrator + auditor output shape)
 verify:
-	$(VENV_PYTHON) scripts/verify_day5.py
+	$(VENV_PYTHON) scripts/verify_e2e.py
 
 # Start Streamlit UI
 ui:

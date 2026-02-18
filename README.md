@@ -1,5 +1,11 @@
 # PostMortem AI
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Elasticsearch](https://img.shields.io/badge/Elasticsearch-ES%7CQL-00BFB3?logo=elasticsearch)](https://www.elastic.co/)
+[![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B?logo=streamlit)](https://streamlit.io/)
+[![Render](https://img.shields.io/badge/Deploy-Render-46E3B7?logo=render)](https://render.com/)
+
 **Evidence-linked incident post-mortems with integrity scoring.** Elasticsearch holds the timeline; a Narrator agent produces claims tied to refs; an Auditor validates those refs, scores decision integrity, and flags governance issues. All deterministic and versionable.
 
 ---
@@ -15,7 +21,7 @@ make demo           # narrator → auditor for INC-1042
 make ui             # Streamlit app
 ```
 
-**Windows (PowerShell):** same flow with `python -m venv venv`, `.\venv\Scripts\Activate.ps1`, `pip install -r requirements.txt`, then `python scripts/create_indices.py --recreate`, `python scripts/bulk_load.py`, `python scripts/demo_day5_e2e.py --incident INC-1042`, `streamlit run app.py`.
+**Windows (PowerShell):** same flow with `python -m venv venv`, `.\venv\Scripts\Activate.ps1`, `pip install -r requirements.txt`, then `python scripts/create_indices.py --recreate`, `python scripts/bulk_load.py`, `python scripts/run_e2e.py --incident INC-1042`, `streamlit run app.py`.
 
 ---
 
@@ -76,10 +82,10 @@ Prefix `pmai` is from `ES_INDEX_PREFIX` (default `pmai`).
 1. **Setup** — `python -m venv venv`, activate, `pip install -r requirements.txt`. Copy `.env.example` to `.env`, set `ES_URL` and `ES_API_KEY` (Elasticsearch Serverless).
 2. **Indices** — `python scripts/create_indices.py --recreate` (uses `mappings/*.json`).
 3. **Load** — `python scripts/bulk_load.py` (loads from `data/`).
-4. **Demo** — `python scripts/demo_day5_e2e.py --incident INC-1042` → `out/postmortem_*.json`, `out/audit_*.json`, console executive summary.
+4. **Demo** — `python scripts/run_e2e.py --incident INC-1042` → `out/postmortem_*.json`, `out/audit_*.json`, console executive summary.
 5. **UI** — `streamlit run app.py` → Generate post-mortem, Run audit, view Timeline / Post-mortem JSON / Audit JSON / Stored Artifacts. Check “Store outputs to Elasticsearch” to version artifacts.
 
-**Make (mac/Linux):** `make setup`, `make indices`, `make load`, `make demo`, `make ui`; `make verify` runs `scripts/verify_day5.py`.
+**Make (mac/Linux):** `make setup`, `make indices`, `make load`, `make demo`, `make ui`; `make verify` runs `scripts/verify_e2e.py`.
 
 ---
 

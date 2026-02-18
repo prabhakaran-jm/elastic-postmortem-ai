@@ -26,6 +26,5 @@ Thumbs.db
 *.swo
 
 # Generated demo outputs
-out/*.json
-out/*.md
+out/
 
