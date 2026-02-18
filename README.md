@@ -47,11 +47,11 @@ flowchart LR
     M[chat_messages]
   end
 
-  ES --> |ES|QL timeline| N[Narrator]
-  N --> |postmortem JSON| R[Auditor]
-  R --> |audit JSON| OUT[out/ + optional store]
-  N --> |store| P[postmortem_reports]
-  R --> |store| P
+  ES -->|ESQL timeline| N[Narrator]
+  N -->|postmortem JSON| R[Auditor]
+  N -->|audit JSON| OUT[out/ + optional store]
+  N -->|store| P[Postmortem_reports]
+  R -->|store| P
 ```
 
 - **Narrator:** Loads incident context (ES|QL over logs, alerts, changes, chat, tickets), enriches change summaries, produces post-mortem (summary, claims with evidence_refs, decision_integrity_artifacts).
