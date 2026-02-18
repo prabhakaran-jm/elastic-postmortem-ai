@@ -1,134 +1,100 @@
-# PostMortem AI: Integrity-Aware Incident Agent
+# PostMortem AI
 
-Multi-agent Elasticsearch-powered system that auto-generates evidence-backed incident post-mortems, audits inconsistencies, detects decision integrity gaps, and triggers remediation workflows.
-
-## Day 1 goal
-
-Create indices and load a synthetic dataset into **Elasticsearch Serverless**.
+**Evidence-linked incident post-mortems with integrity scoring.** Elasticsearch holds the timeline; a Narrator agent produces claims tied to refs; an Auditor validates those refs, scores decision integrity, and flags governance issues. All deterministic and versionable.
 
 ---
 
-## Setup
-
-1. **Create and activate a virtual environment**
-
-   ```bash
-   python -m venv venv
-   # Windows
-   venv\Scripts\activate
-   # macOS/Linux
-   source venv/bin/activate
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Configure environment**
-
-   ```bash
-   copy .env.example .env
-   ```
-
-   Then see **Configuration** below.
-
----
-
-## Configuration
-
-Set these in `.env` (from `.env.example`):
-
-- **ES_URL** — Your Elasticsearch Serverless endpoint (e.g. `https://…\.es.\<region>.gcp.cloud.es.io`).
-- **ES_API_KEY** — API key for Serverless; this is the only auth mechanism used.
-
-Do not commit `.env` or real secrets.
-
----
-
-## Day 1 run commands
-
-From the project root (with `venv` activated):
+## 30-second demo
 
 ```bash
-# Create indices (uses mappings/)
-python scripts/create_indices.py
-
-# Bulk load synthetic dataset from data/
-python scripts/bulk_load.py
-
-# Verify indices and document counts
-python scripts/verify.py
+make setup          # venv + pip install (mac/Linux)
+# Set ES_URL + ES_API_KEY in .env
+make indices        # create indices
+make load           # bulk load synthetic data
+make demo           # narrator → auditor for INC-1042
+make ui             # Streamlit app
 ```
+
+**Windows (PowerShell):** same flow with `python -m venv venv`, `.\venv\Scripts\Activate.ps1`, `pip install -r requirements.txt`, then `python scripts/create_indices.py --recreate`, `python scripts/bulk_load.py`, `python scripts/demo_day5_e2e.py --incident INC-1042`, `streamlit run app.py`.
 
 ---
 
-## Day 2 – Incident timeline (ES|QL)
+## What makes it different
 
-Run the ES|QL query to fetch a single chronological timeline (logs, alerts, changes, chat, tickets) for an incident.
-
-```bash
-python scripts/run_esql.py --file tools/get_incident_context.esql --incident INC-1042
-```
-
-Prints a table: `ts | kind | service | ref | summary`.
+- **Evidence-linked claims** — Every claim points at timeline refs (logs, changes, tickets). No free-form narrative without a trace.
+- **Decision integrity** — Change/approval records are extracted and scored (who approved what, in/out of window). Auditor detects governance violations (e.g. overstrong causality).
+- **Deterministic scores** — Same timeline → same post-mortem and audit. No API calls required (mock mode); optional OpenAI for richer text.
+- **Versioned artifacts** — Narrator and audit reports can be stored in Elasticsearch (narrator_report / audit_report) with versions for audit trail.
 
 ---
 
-## Day 3 – Narrator Agent
+## Architecture
 
-The Narrator fetches the incident timeline (ES|QL), then generates an evidence-backed post-mortem.
+```mermaid
+flowchart LR
+  subgraph ES["Elasticsearch"]
+    I[incidents]
+    L[logs]
+    A[alerts]
+    C[changes]
+    T[tickets]
+    M[chat_messages]
+  end
 
-**Outputs:** `out/postmortem_<incident_id>.md` and `out/postmortem_<incident_id>.json` (summary, impact, timeline, claims, root causes, follow-ups).
-
-**Run:**
-
-```bash
-# Generate markdown + JSON only
-python scripts/narrator_runner.py --incident INC-1042
-
-# Also upsert the report into the postmortem_reports index (draft)
-python scripts/narrator_runner.py --incident INC-1042 --store
+  ES --> |ES|QL timeline| N[Narrator]
+  N --> |postmortem JSON| R[Auditor]
+  R --> |audit JSON| OUT[out/ + optional store]
+  N --> |store| P[postmortem_reports]
+  R --> |store| P
 ```
 
-Runs in **mock mode** (deterministic from timeline) unless `OPENAI_API_KEY` is set in `.env`.
+- **Narrator:** Loads incident context (ES|QL over logs, alerts, changes, chat, tickets), enriches change summaries, produces post-mortem (summary, claims with evidence_refs, decision_integrity_artifacts).
+- **Auditor:** Validates refs against Elasticsearch, challenges unsupported claims, scores overall + decision integrity, emits governance findings.
 
 ---
 
-## Day 5: Elastic-native E2E Loop
+## Data model (indices)
 
-One-command demo: narrator and auditor in-process, then executive summary.
+| Index | Purpose |
+|-------|---------|
+| `pmai-incidents` | Incident metadata |
+| `pmai-logs` | Log events |
+| `pmai-alerts` | Alerts |
+| `pmai-changes` | Changes / deployments / approvals |
+| `pmai-chat_messages` | Chat (e.g. Slack) |
+| `pmai-tickets` | Tickets (e.g. Jira) |
+| `pmai-metrics` | Metrics |
+| `pmai-runbook_policies` | Runbook / policy definitions |
+| `pmai-postmortem_reports` | Stored narrator_report + audit_report (versioned) |
 
-```bash
-python scripts/demo_day5_e2e.py --incident INC-1042
-```
-
-**Outputs:** `out/postmortem_<incident_id>.json` and `out/audit_<incident_id>.json`, plus an Executive Summary to the console.
-
-**Optional storage:** Use `--store` on the individual scripts to persist to `pmai-postmortem_reports`:
-
-- `python scripts/narrator_runner.py --incident INC-1042 --store`
-- `python scripts/auditor_runner.py --incident INC-1042 --store`
-
-**Flow:**
-
-- **Narrator** → Evidence-linked postmortem (timeline, claims, decision_integrity_artifacts).
-- **Auditor** → Validates evidence refs, flags governance violations, and produces integrity + decision-integrity scores.
+Prefix `pmai` is from `ES_INDEX_PREFIX` (default `pmai`).
 
 ---
 
-## Verification
+## Runbook
 
-From the project root (with `venv` activated and data loaded):
+1. **Setup** — `python -m venv venv`, activate, `pip install -r requirements.txt`. Copy `.env.example` to `.env`, set `ES_URL` and `ES_API_KEY` (Elasticsearch Serverless).
+2. **Indices** — `python scripts/create_indices.py --recreate` (uses `mappings/*.json`).
+3. **Load** — `python scripts/bulk_load.py` (loads from `data/`).
+4. **Demo** — `python scripts/demo_day5_e2e.py --incident INC-1042` → `out/postmortem_*.json`, `out/audit_*.json`, console executive summary.
+5. **UI** — `streamlit run app.py` → Generate post-mortem, Run audit, view Timeline / Post-mortem JSON / Audit JSON / Stored Artifacts. Check “Store outputs to Elasticsearch” to version artifacts.
 
-```bash
-python scripts/verify_timeline_governance.py
-python scripts/verify_auditor_day4.py
-```
+**Make (mac/Linux):** `make setup`, `make indices`, `make load`, `make demo`, `make ui`; `make verify` runs `scripts/verify_day5.py`.
 
-- **verify_timeline_governance.py** — Asserts DEP-7781 timeline summary contains approvals 1/2, window=out_of_window, author=ops-alice, and `decision_integrity_artifacts == ["DEP-7781", "RB-7781"]`.
-- **verify_auditor_day4.py** — Asserts the auditor produces an evidence-linked decision integrity finding for INC-1042 (governance_violation_detected with evidence_refs and details, score_breakdown).
+---
+
+## Deploy to Render
+
+Deploy the Streamlit UI as a Render Web Service (zero code logic changes).
+
+1. **Connect the repo** to Render and create a **Web Service** from the repo. Render will detect `render.yaml` (Blueprint).
+2. **Environment variables** (required in Render Dashboard → Service → Environment):
+   - **ES_URL** — Your Elasticsearch endpoint (e.g. `https://….es.<region>.gcp.cloud.es.io`).
+   - **ES_API_KEY** — API key for Elasticsearch Serverless.
+   - **ES_VERIFY_TLS** — Optional; set to `false` if your cluster uses self-signed or internal certs (default `true`).
+3. **Deploy** — Render runs `pip install -r requirements.txt` then `streamlit run app.py --server.port $PORT --server.address 0.0.0.0`. Health checks use path `/`.
+
+**Run locally (same app):** `streamlit run app.py` (with `ES_URL` and `ES_API_KEY` in `.env`). Use `make ui` after `make setup` if you use the Makefile.
 
 ---
 

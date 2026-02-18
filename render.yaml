@@ -1,0 +1,9 @@
+# Render Blueprint: Streamlit UI for PostMortem AI
+# Set ES_URL, ES_API_KEY (and optionally ES_VERIFY_TLS) in the Render dashboard.
+services:
+  - type: web
+    runtime: python
+    name: postmortem-ai-ui
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+    healthCheckPath: /

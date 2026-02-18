@@ -1,0 +1,4 @@
+# Hosted / headless: do not open a browser; disable CORS for embedding
+[server]
+headless = true
+enableCORS = false

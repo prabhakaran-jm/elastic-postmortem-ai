@@ -17,6 +17,16 @@ def _safe_get_client():
         return None
 
 
+def _elasticsearch_connected() -> bool:
+    """Inexpensive ping to Elasticsearch; used for health indicator only."""
+    try:
+        from scripts.es_client import get_client
+        client = get_client()
+        return client.ping()
+    except Exception:
+        return False
+
+
 def _compute_confidence_drift(audit: dict) -> float:
     return round(
         sum(
@@ -41,6 +51,7 @@ def _compute_causality_strength(audit: dict) -> int:
 
 st.set_page_config(page_title="Postmortem AI", layout="wide")
 st.title("Postmortem AI: Incident Narrator + Integrity Auditor")
+st.caption(f"Connected to Elasticsearch: {'Yes' if _elasticsearch_connected() else 'No'}")
 
 with st.expander("Demo Notes", expanded=False):
     st.markdown(
