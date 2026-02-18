@@ -1,3 +1,4 @@
 elasticsearch
 jsonschema
 python-dotenv
+streamlit

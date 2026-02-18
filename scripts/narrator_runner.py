@@ -284,20 +284,13 @@ def render_markdown(data: dict) -> str:
     return "\n".join(lines)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Run Narrator: fetch timeline, generate postmortem JSON + MD.")
-    parser.add_argument("--incident", default="INC-1042", help="Incident ID (default: INC-1042)")
-    parser.add_argument("--store", action="store_true", help="Upsert report into Elasticsearch postmortem_reports index")
-    parser.add_argument("--inject_error", action="store_true", help="Inject a bad evidence ref so auditor will challenge (demo)")
-    args = parser.parse_args()
-    incident_id = args.incident
-
+def run_narrator(incident_id: str, inject_error: bool = False) -> dict:
+    """Run narrator pipeline in-process; return report dict (no file I/O)."""
     client = get_client()
     context = load_incident_context(client, incident_id)
     timeline = context["timeline"]
     if not timeline:
-        print("No timeline rows returned.", file=sys.stderr)
-        sys.exit(1)
+        raise ValueError("No timeline rows returned.")
     enrich_change_summaries(timeline, client)
     start_ts = context["time_window"]["start"]
     end_ts = context["time_window"]["end"]
@@ -306,12 +299,28 @@ def main() -> None:
     if data is None:
         data = run_mock_narrator(incident_id, timeline, start_ts, end_ts)
 
-    if getattr(args, "inject_error", False):
+    if inject_error:
         claims_list = data.get("claims", [])
         if claims_list:
             claims_list[2]["evidence_refs"] = list(claims_list[2].get("evidence_refs", [])) + ["E-99"]
 
     data["decision_integrity_artifacts"] = decision_integrity_artifacts_from_timeline(data.get("timeline", []))
+    return data
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run Narrator: fetch timeline, generate postmortem JSON + MD.")
+    parser.add_argument("--incident", default="INC-1042", help="Incident ID (default: INC-1042)")
+    parser.add_argument("--store", action="store_true", help="Upsert report into Elasticsearch postmortem_reports index")
+    parser.add_argument("--inject_error", action="store_true", help="Inject a bad evidence ref so auditor will challenge (demo)")
+    args = parser.parse_args()
+    incident_id = args.incident
+
+    try:
+        data = run_narrator(incident_id, inject_error=getattr(args, "inject_error", False))
+    except Exception as e:
+        print(str(e), file=sys.stderr)
+        sys.exit(1)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     json_path = OUT_DIR / f"postmortem_{incident_id}.json"
@@ -325,6 +334,7 @@ def main() -> None:
     print(md_path)
 
     if args.store:
+        client = get_client()
         from storage import store_artifact
         stored_id = store_artifact(client, incident_id, "narrator_report", data)
         print("STORED_OK", stored_id)

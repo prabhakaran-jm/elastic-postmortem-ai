@@ -66,3 +66,41 @@ def store_artifact(
     }
     client.index(index=index_name(INDEX), id=doc_id, document=body)
     return doc_id
+
+
+def list_artifacts(client: Any, incident_id: str, size: int = 50) -> list[dict]:
+    """List stored artifacts for incident_id. Returns list of {doc_id, artifact_type, version, generated_at}."""
+    idx = index_name(INDEX)
+    try:
+        r = client.search(
+            index=idx,
+            body={
+                "size": size,
+                "query": {"term": {"incident_id": incident_id}},
+                "sort": [{"generated_at": {"order": "desc", "unmapped_type": "date"}}],
+                "_source": ["artifact_type", "artifact_version", "generated_at"],
+            },
+        )
+    except Exception:
+        return []
+    out: list[dict] = []
+    for hit in (r.get("hits") or {}).get("hits") or []:
+        src = hit.get("_source") or {}
+        doc_id = hit.get("_id", "")
+        out.append({
+            "doc_id": doc_id,
+            "artifact_type": src.get("artifact_type", ""),
+            "version": src.get("artifact_version", ""),
+            "generated_at": src.get("generated_at", ""),
+        })
+    return out
+
+
+def get_artifact(client: Any, doc_id: str) -> dict:
+    """Fetch one artifact by doc_id. Returns document _source (includes payload)."""
+    idx = index_name(INDEX)
+    try:
+        r = client.get(index=idx, id=doc_id)
+        return r.get("_source") or {}
+    except Exception:
+        return {}
