@@ -32,23 +32,34 @@ def _elasticsearch_connected() -> bool:
         return False
 
 
+def _to_float(x, default: float = 0.0) -> float:
+    """Coerce to float for confidence values; tolerate str or missing."""
+    if x is None:
+        return default
+    if isinstance(x, (int, float)):
+        return float(x)
+    if isinstance(x, str):
+        try:
+            return float(x)
+        except (ValueError, TypeError):
+            return default
+    return default
+
+
 def _compute_confidence_drift(audit: dict) -> float:
-    return round(
-        sum(
-            c.get("confidence_original", 0) - c.get("confidence_adjusted", 0)
-            for c in audit.get("validated_claims", [])
-        )
-        + sum(
-            c.get("confidence_original", 0) - c.get("confidence_adjusted", 0)
-            for c in audit.get("challenged_claims", [])
-        ),
-        4,
-    )
+    total = 0.0
+    for c in audit.get("validated_claims", []) + audit.get("challenged_claims", []):
+        if not isinstance(c, dict):
+            continue
+        orig = _to_float(c.get("confidence_original"), 0.0)
+        adj = _to_float(c.get("confidence_adjusted"), 0.0)
+        total += orig - adj
+    return round(total, 4)
 
 
 def _compute_causality_strength(audit: dict) -> int:
     has_issue = any(
-        f.get("finding_type") == "overstrong_causality"
+        isinstance(f, dict) and f.get("finding_type") == "overstrong_causality"
         for f in audit.get("integrity_findings", [])
     )
     return 100 if not has_issue else 70

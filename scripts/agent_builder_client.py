@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Kibana Agent Builder chat API client. Used when KIBANA_URL and KIBANA_API_KEY are set."""
 import json
+import logging
 import os
 from typing import Any
 
@@ -8,6 +9,14 @@ import requests
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+if os.getenv("AGENT_BUILDER_DEBUG", "").strip().lower() in ("1", "true", "yes"):
+    logger.setLevel(logging.DEBUG)
+    if not logger.handlers:
+        h = logging.StreamHandler()
+        h.setLevel(logging.DEBUG)
+        logger.addHandler(h)
 
 KIBANA_URL = (os.getenv("KIBANA_URL") or "").strip().rstrip("/")
 KIBANA_API_KEY = (os.getenv("KIBANA_API_KEY") or "").strip()
@@ -51,10 +60,9 @@ def call_agent(agent_id: str, user_content: str) -> dict:
         path = spec["path"]
         if spec.get("url_agent_id"):
             path = path.format(agent_id=agent_id)
-        else:
-            path = path  # converse uses agent_id in body
         url = KIBANA_URL + path
         payload = spec["body"](agent_id, user_content)
+        logger.info("Agent Builder try: url=%s agent_id=%s", url, agent_id)
         try:
             r = requests.post(
                 url,
@@ -62,9 +70,11 @@ def call_agent(agent_id: str, user_content: str) -> dict:
                 json=payload,
                 timeout=AGENT_TIMEOUT_SECS,
             )
+            logger.info("Agent Builder response: url=%s status=%s", url, r.status_code)
             if r.status_code == 200:
                 return r.json()
-            last_error = f"HTTP {r.status_code}: {r.text[:500] if r.text else 'no body'}"
+            last_error = f"HTTP {r.status_code} for agent_id={agent_id!r}: {r.text[:500] if r.text else 'no body'}"
         except requests.RequestException as e:
             last_error = str(e)
+            logger.warning("Agent Builder request failed: url=%s error=%s", url, e)
     raise RuntimeError(f"Agent Builder chat failed: {last_error}")

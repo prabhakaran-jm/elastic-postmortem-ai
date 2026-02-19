@@ -111,6 +111,8 @@ If `KIBANA_URL` and `KIBANA_API_KEY` are set in `.env`, the Streamlit app will c
 
 **If you get HTTP 404:** Your deployment may use a space or a different API path. Try (1) setting `KIBANA_SPACE_ID=default`, or (2) finding the correct path in Kibana/API docs and setting `KIBANA_CONVERSE_PATH` to that path (e.g. `/s/default/api/agent_builder/converse`). Ensure `KIBANA_URL` is the Kibana base URL with no path (e.g. `https://<deploy>.kb.<region>.gcp.cloud.es.io`), unless your API lives under a path.
 
+**If the Auditor works but the Narrator returns 404:** The error message will include the `agent_id` that failed. In Kibana (Agent Builder), open the **Narrator** agent and check its exact ID—e.g. from the URL when editing the agent (`/app/agent_builder/agents/<id>`) or from the agent’s settings. Set `AGENT_NARRATOR_ID` in `.env` to that exact value (some deployments use a different slug or a UUID).
+
 **Test agent connectivity (curl):** Uses the Kibana 9.2+ Agent Builder converse API.
 ```bash
 curl -s -X POST "${KIBANA_URL}/api/agent_builder/converse" \
