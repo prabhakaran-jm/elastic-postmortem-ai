@@ -1,22 +1,12 @@
 #!/usr/bin/env python3
 """Kibana Agent Builder chat API client. Used when KIBANA_URL and KIBANA_API_KEY are set."""
 import json
-import logging
 import os
-from typing import Any
 
 import requests
 from dotenv import load_dotenv
 
 load_dotenv()
-
-logger = logging.getLogger(__name__)
-if os.getenv("AGENT_BUILDER_DEBUG", "").strip().lower() in ("1", "true", "yes"):
-    logger.setLevel(logging.DEBUG)
-    if not logger.handlers:
-        h = logging.StreamHandler()
-        h.setLevel(logging.DEBUG)
-        logger.addHandler(h)
 
 KIBANA_URL = (os.getenv("KIBANA_URL") or "").strip().rstrip("/")
 KIBANA_API_KEY = (os.getenv("KIBANA_API_KEY") or "").strip()
@@ -72,7 +62,6 @@ def call_agent(agent_id: str, user_content: str, timeout_secs: int | None = None
             path = path.format(agent_id=agent_id)
         url = KIBANA_URL + path
         payload = spec["body"](agent_id, user_content)
-        logger.info("Agent Builder try: url=%s agent_id=%s timeout=%ss", url, agent_id, timeout)
         try:
             r = requests.post(
                 url,
@@ -80,7 +69,6 @@ def call_agent(agent_id: str, user_content: str, timeout_secs: int | None = None
                 json=payload,
                 timeout=timeout,
             )
-            logger.info("Agent Builder response: url=%s status=%s", url, r.status_code)
             if r.status_code == 200:
                 if not (r.text or "").strip():
                     last_error = "HTTP 200 with empty response body"
@@ -100,7 +88,6 @@ def call_agent(agent_id: str, user_content: str, timeout_secs: int | None = None
                 last_error = err
         except requests.RequestException as e:
             err = str(e)
-            logger.warning("Agent Builder request failed: url=%s error=%s", url, e)
             # Prefer keeping timeout errors over later 404s
             if last_error is None or not _is_timeout_error(last_error):
                 last_error = err
