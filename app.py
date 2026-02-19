@@ -73,8 +73,14 @@ with bar_right:
     col1, col2, col3 = st.columns(3)
 
 # System status row (compact)
+try:
+    from scripts.agent_builder_client import is_agent_builder_configured
+    agent_builder_on = is_agent_builder_configured()
+except Exception:
+    agent_builder_on = False
 st.markdown(
     f"**Elasticsearch:** {es_yes_no} · **Incident ID:** `{incident_id}` · **Store to ES:** {'On' if store_to_es else 'Off'}"
+    + f" · **Agent Builder:** {'On' if agent_builder_on else 'Off'}"
 )
 st.divider()
 
@@ -97,6 +103,10 @@ if "stored_arts" not in st.session_state:
     st.session_state["stored_arts"] = {}  # incident_id -> list of artifact dicts
 if "timeline_incident_id" not in st.session_state:
     st.session_state["timeline_incident_id"] = None
+if "narrator_via_agent_builder" not in st.session_state:
+    st.session_state["narrator_via_agent_builder"] = None
+if "audit_via_agent_builder" not in st.session_state:
+    st.session_state["audit_via_agent_builder"] = None
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -146,6 +156,7 @@ def _generate_postmortem(*, store: bool = False):
             report = run_narrator_via_agent_builder(incident_id)
             st.session_state["narrator"] = report
             st.session_state["audit"] = None
+            st.session_state["narrator_via_agent_builder"] = True
             st.toast("Narrator ran via Agent Builder")
             if store and report:
                 from scripts.storage import store_artifact
@@ -154,9 +165,11 @@ def _generate_postmortem(*, store: bool = False):
             return
     except Exception as e:
         st.warning(f"Agent Builder narrator failed ({e}); using local pipeline.")
+    st.session_state["narrator_via_agent_builder"] = False
     report = _run_narrator_cached(incident_id)
     st.session_state["narrator"] = report
     st.session_state["audit"] = None
+    st.toast("Narrator ran (local pipeline)")
     if store and report:
         from scripts.storage import store_artifact
         stored_id = store_artifact(client, incident_id, "narrator_report", report)
@@ -184,6 +197,7 @@ def _run_audit(*, store: bool = False):
         if is_agent_builder_configured():
             audit = run_auditor_via_agent_builder(incident_id, report)
             st.session_state["audit"] = audit
+            st.session_state["audit_via_agent_builder"] = True
             st.toast("Auditor ran via Agent Builder")
             if store and audit:
                 from scripts.storage import store_artifact
@@ -192,8 +206,10 @@ def _run_audit(*, store: bool = False):
             return
     except Exception as e:
         st.warning(f"Agent Builder auditor failed ({e}); using local pipeline.")
+    st.session_state["audit_via_agent_builder"] = False
     audit = _run_audit_cached(incident_id, json.dumps(report, sort_keys=True))
     st.session_state["audit"] = audit
+    st.toast("Auditor ran (local pipeline)")
     if store and audit:
         from scripts.storage import store_artifact
         stored_id = store_artifact(client, incident_id, "audit_report", audit)
@@ -255,14 +271,18 @@ n_valid = len(audit.get("validated_claims", [])) if audit else 0
 n_challenged = len(audit.get("challenged_claims", [])) if audit else 0
 n_refs = len({r.get("ref") for r in timeline if r.get("ref")}) if timeline else 0
 n_claims = len(narrator.get("claims", [])) if narrator else 0
+narrator_src = "Agent Builder" if st.session_state.get("narrator_via_agent_builder") else ("local" if st.session_state.get("narrator_via_agent_builder") is False and narrator else None)
+audit_src = "Agent Builder" if st.session_state.get("audit_via_agent_builder") else ("local" if st.session_state.get("audit_via_agent_builder") is False and audit else None)
 if timeline or narrator or audit:
     st.caption("**Agent execution trace**")
     if timeline:
         st.markdown(f"- ES|QL: loaded timeline ({len(timeline)} events, {n_refs} refs)")
     if narrator:
-        st.markdown(f"- Narrator: generated claims ({n_claims})")
+        src = f" ({narrator_src})" if narrator_src else ""
+        st.markdown(f"- Narrator: generated claims ({n_claims}){src}")
     if audit:
-        st.markdown(f"- Auditor: validated {n_valid}, challenged {n_challenged}")
+        src = f" ({audit_src})" if audit_src else ""
+        st.markdown(f"- Auditor: validated {n_valid}, challenged {n_challenged}{src}")
     if audit and gov_count is not None:
         st.markdown(f"- Governance findings: {gov_count}")
 else:
