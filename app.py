@@ -416,8 +416,8 @@ def _audit_to_markdown(data: dict) -> str:
             if not isinstance(f, dict):
                 continue
             ft = f.get("finding_type") or "finding"
-            desc = (f.get("description") or f.get("summary") or "").replace("|", "\\|")
-            lines.append(f"- **{ft}:** {desc}")
+            desc = (f.get("description") or f.get("summary") or "").strip().replace("|", "\\|")
+            lines.append(f"- **{ft}:** {desc}" if desc else f"- **{ft}**")
     return "\n".join(lines) if lines else "_No content._"
 
 
