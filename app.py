@@ -180,7 +180,7 @@ def _generate_postmortem(*, store: bool = False):
     report = _run_narrator_cached(incident_id)
     st.session_state["narrator"] = report
     st.session_state["audit"] = None
-    st.toast("Narrator ran (local pipeline)")
+    st.toast("Narrator ran (demo fallback — Agent Builder unavailable)")
     if store and report:
         from scripts.storage import store_artifact
         stored_id = store_artifact(client, incident_id, "narrator_report", report)
@@ -220,7 +220,7 @@ def _run_audit(*, store: bool = False):
     st.session_state["audit_via_agent_builder"] = False
     audit = _run_audit_cached(incident_id, json.dumps(report, sort_keys=True))
     st.session_state["audit"] = audit
-    st.toast("Auditor ran (local pipeline)")
+    st.toast("Auditor ran (demo fallback — Agent Builder unavailable)")
     if store and audit:
         from scripts.storage import store_artifact
         stored_id = store_artifact(client, incident_id, "audit_report", audit)
@@ -282,8 +282,8 @@ n_valid = len(audit.get("validated_claims", [])) if audit else 0
 n_challenged = len(audit.get("challenged_claims", [])) if audit else 0
 n_refs = len({r.get("ref") for r in timeline if r.get("ref")}) if timeline else 0
 n_claims = len(narrator.get("claims", [])) if narrator else 0
-narrator_src = "Agent Builder" if st.session_state.get("narrator_via_agent_builder") else ("local" if st.session_state.get("narrator_via_agent_builder") is False and narrator else None)
-audit_src = "Agent Builder" if st.session_state.get("audit_via_agent_builder") else ("local" if st.session_state.get("audit_via_agent_builder") is False and audit else None)
+narrator_src = "Agent Builder" if st.session_state.get("narrator_via_agent_builder") else ("demo fallback — Agent Builder unavailable" if st.session_state.get("narrator_via_agent_builder") is False and narrator else None)
+audit_src = "Agent Builder" if st.session_state.get("audit_via_agent_builder") else ("demo fallback — Agent Builder unavailable" if st.session_state.get("audit_via_agent_builder") is False and audit else None)
 if timeline or narrator or audit:
     st.caption("**Agent execution trace**")
     if timeline:
@@ -370,6 +370,57 @@ def _narrator_to_markdown(data: dict) -> str:
     return "\n".join(lines) if lines else "_No content._"
 
 
+def _audit_to_markdown(data: dict) -> str:
+    """Render audit as markdown: scores, validated claims, challenged claims, integrity findings."""
+    lines = []
+    overall = data.get("overall_integrity_score")
+    decision = data.get("decision_integrity_score")
+    if overall is not None or decision is not None:
+        lines.append("## Scores\n")
+        if overall is not None:
+            lines.append(f"- **Overall integrity:** {overall}/100")
+        if decision is not None:
+            lines.append(f"- **Decision integrity:** {decision}/100")
+        lines.append("")
+    validated = data.get("validated_claims") or []
+    if validated:
+        lines.append("## Validated claims\n")
+        lines.append("| Statement | Evidence refs | Notes |")
+        lines.append("|-----------|---------------|-------|")
+        for c in validated:
+            if not isinstance(c, dict):
+                continue
+            stmt = (c.get("statement") or "").replace("|", "\\|")[:60]
+            refs = ", ".join(c.get("evidence_refs") or [])
+            notes = (c.get("notes") or "").replace("|", "\\|")[:40]
+            lines.append(f"| {stmt} | {refs} | {notes} |")
+        lines.append("")
+    challenged = data.get("challenged_claims") or []
+    if challenged:
+        lines.append("## Challenged claims\n")
+        lines.append("| Statement | Missing refs | Reason | Suggested rewrite |")
+        lines.append("|-----------|---------------|--------|-------------------|")
+        for c in challenged:
+            if not isinstance(c, dict):
+                continue
+            stmt = (c.get("statement") or "").replace("|", "\\|")[:50]
+            missing = ", ".join(c.get("missing_refs") or [])
+            reason = (c.get("reason") or "").replace("|", "\\|")[:40]
+            rewrite = (c.get("suggested_rewrite") or "").replace("|", "\\|")[:40]
+            lines.append(f"| {stmt} | {missing} | {reason} | {rewrite} |")
+        lines.append("")
+    findings = data.get("integrity_findings") or []
+    if findings:
+        lines.append("## Integrity findings\n")
+        for f in findings:
+            if not isinstance(f, dict):
+                continue
+            ft = f.get("finding_type") or "finding"
+            desc = (f.get("description") or f.get("summary") or "").replace("|", "\\|")
+            lines.append(f"- **{ft}:** {desc}")
+    return "\n".join(lines) if lines else "_No content._"
+
+
 with tab_pm:
     st.caption("Evidence-linked post-mortem: summary, claims, root causes (from Narrator agent).")
     narrator = st.session_state.get("narrator")
@@ -385,9 +436,13 @@ with tab_pm:
 with tab_audit:
     st.caption("Integrity audit: validated/challenged claims, governance findings, scores.")
     if audit:
-        st.json(audit)
+        show_raw_audit = st.checkbox("Show raw JSON", value=False, key="show_raw_audit")
+        if show_raw_audit:
+            st.json(audit)
+        else:
+            st.markdown(_audit_to_markdown(audit))
     else:
-        st.info("Run an audit to view JSON.")
+        st.info("Run an audit to view output.")
 
 with tab_stored:
     st.caption("Versioned narrator and audit reports stored in Elasticsearch (when Store to ES is on).")
