@@ -36,8 +36,23 @@ def _find_json_objects(s: str) -> list[tuple[int, int]]:
 
 def extract_json_from_agent_response(resp: dict) -> dict:
     """Find the largest JSON object in any string field of resp (or nested). Return parsed dict. Raises on failure."""
-    candidates: list[str] = []
+    # Prefer Kibana converse API: response.message is the agent's reply (often JSON)
+    message = (resp.get("response") or {}).get("message")
+    if isinstance(message, str) and message.strip():
+        for start, end in _find_json_objects(message):
+            try:
+                parsed = json.loads(message[start:end])
+                if isinstance(parsed, dict):
+                    return parsed
+            except json.JSONDecodeError:
+                continue
+        if message.strip().startswith("{") and message.strip().endswith("}"):
+            try:
+                return json.loads(message.strip())
+            except json.JSONDecodeError:
+                pass
 
+    candidates: list[str] = []
     def collect_strings(obj: Any) -> None:
         if isinstance(obj, str):
             candidates.append(obj)
@@ -47,7 +62,6 @@ def extract_json_from_agent_response(resp: dict) -> dict:
         elif isinstance(obj, list):
             for v in obj:
                 collect_strings(v)
-
     collect_strings(resp)
 
     best: dict | None = None
