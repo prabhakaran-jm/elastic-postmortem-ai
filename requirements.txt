@@ -1,4 +1,5 @@
 elasticsearch
 jsonschema
 python-dotenv
+requests
 streamlit

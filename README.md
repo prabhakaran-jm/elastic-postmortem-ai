@@ -89,6 +89,33 @@ Prefix `pmai` is from `ES_INDEX_PREFIX` (default `pmai`).
 
 ---
 
+## Agent Builder mode
+
+If `KIBANA_URL` and `KIBANA_API_KEY` are set in `.env`, the Streamlit app will call **Kibana Agent Builder** for the Narrator and Auditor. Otherwise it uses the local deterministic pipeline (no Kibana required).
+
+- **Env vars:** `KIBANA_URL`, `KIBANA_API_KEY`; optional: `AGENT_NARRATOR_ID` (default `incident-narrator-agent`), `AGENT_AUDITOR_ID` (default `incident-integrity-auditor`), `AGENT_TIMEOUT_SECS` (default `60`).
+- **Fallback:** If the agent call fails or env is missing, the UI falls back to the local narrator/auditor and shows a short warning.
+- **Smoke test:** From repo root: `python -m scripts.agent_smoke_test` (checks config and calls the narrator agent for INC-1042; prints first 200 chars of JSON).
+
+**How to get these values**
+
+| Variable | How to get it |
+|----------|----------------|
+| **KIBANA_URL** | **Elastic Cloud:** Deployments → your deployment → Kibana → copy the URL (e.g. `https://<deployment>.kb.<region>.gcp.cloud.es.io`). No port needed if using default HTTPS. **Self‑hosted:** Your Kibana base URL (e.g. `https://kibana.example.com`). |
+| **KIBANA_API_KEY** | **In Kibana:** Help (?) → **Connection details** → **API key** → Create API key (name it, copy the key). Or: **Management** → **API keys** → Create. Use the encoded string (ID:key) as `KIBANA_API_KEY`. Same API key used for Elasticsearch often works for Kibana API if it has Kibana access. |
+| **AGENT_NARRATOR_ID** | ID of the **Narrator** agent in Kibana Agent Builder (e.g. **Machine Learning** → **Agent Builder** or **Search** → **Agent**). Use the agent’s ID/slug from the agent config or URL. Default `incident-narrator-agent` if you named the agent that. |
+| **AGENT_AUDITOR_ID** | ID of the **Auditor** agent in Agent Builder. Default `incident-integrity-auditor`. |
+| **AGENT_TIMEOUT_SECS** | Optional. Seconds to wait for the agent chat API (default `60`). Increase for slow agents. |
+
+**Test agent connectivity (curl):**
+```bash
+curl -s -X POST "${KIBANA_URL}/api/ai/agents/incident-narrator-agent/chat" \
+  -H "Authorization: ApiKey ${KIBANA_API_KEY}" -H "kbn-xsrf: true" -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"Output only: {\"ok\":true}"}]}'
+```
+
+---
+
 ## Deploy to Render
 
 Deploy the Streamlit UI as a Render Web Service (zero code logic changes).

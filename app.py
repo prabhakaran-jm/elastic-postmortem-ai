@@ -138,6 +138,22 @@ def _generate_postmortem(*, store: bool = False):
     client = _safe_get_client()
     if not client:
         return
+    report = None
+    try:
+        from scripts.agent_builder_client import is_agent_builder_configured
+        from scripts.agent_runner import run_narrator_via_agent_builder
+        if is_agent_builder_configured():
+            report = run_narrator_via_agent_builder(incident_id)
+            st.session_state["narrator"] = report
+            st.session_state["audit"] = None
+            st.toast("Narrator ran via Agent Builder")
+            if store and report:
+                from scripts.storage import store_artifact
+                stored_id = store_artifact(client, incident_id, "narrator_report", report)
+                st.toast(f"Stored narrator_report: {stored_id}")
+            return
+    except Exception as e:
+        st.warning(f"Agent Builder narrator failed ({e}); using local pipeline.")
     report = _run_narrator_cached(incident_id)
     st.session_state["narrator"] = report
     st.session_state["audit"] = None
@@ -161,6 +177,21 @@ def _run_audit(*, store: bool = False):
             report = _run_narrator_cached(incident_id)
             st.session_state["narrator"] = report
 
+    audit = None
+    try:
+        from scripts.agent_builder_client import is_agent_builder_configured
+        from scripts.agent_runner import run_auditor_via_agent_builder
+        if is_agent_builder_configured():
+            audit = run_auditor_via_agent_builder(incident_id, report)
+            st.session_state["audit"] = audit
+            st.toast("Auditor ran via Agent Builder")
+            if store and audit:
+                from scripts.storage import store_artifact
+                stored_id = store_artifact(client, incident_id, "audit_report", audit)
+                st.toast(f"Stored audit_report: {stored_id}")
+            return
+    except Exception as e:
+        st.warning(f"Agent Builder auditor failed ({e}); using local pipeline.")
     audit = _run_audit_cached(incident_id, json.dumps(report, sort_keys=True))
     st.session_state["audit"] = audit
     if store and audit:
