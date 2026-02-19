@@ -15,10 +15,12 @@ AGENT_NARRATOR_ID = os.getenv("AGENT_NARRATOR_ID", "incident-narrator-agent").st
 AGENT_AUDITOR_ID = os.getenv("AGENT_AUDITOR_ID", "incident-integrity-auditor").strip()
 AGENT_TIMEOUT_SECS = max(5, min(300, int(os.getenv("AGENT_TIMEOUT_SECS", "60"))))
 
-# Try in order; first success wins.
-CHAT_ENDPOINT_PATHS = [
-    "/api/ai/agents/{agent_id}/chat",
-    "/api/ai/agent_builder/agents/{agent_id}/chat",
+# Kibana Agent Builder: POST /api/agent_builder/converse with body { agent_id, input } (Kibana 9.2+).
+# Older or alternate paths (agent_id in URL, messages array) kept as fallbacks.
+CHAT_ENDPOINT_SPECS = [
+    {"path": "/api/agent_builder/converse", "body": lambda aid, content: {"agent_id": aid, "input": content}},
+    {"path": "/api/ai/agents/{agent_id}/chat", "body": lambda aid, content: {"messages": [{"role": "user", "content": content}]}, "url_agent_id": True},
+    {"path": "/api/ai/agent_builder/agents/{agent_id}/chat", "body": lambda aid, content: {"messages": [{"role": "user", "content": content}]}, "url_agent_id": True},
 ]
 
 
@@ -35,10 +37,15 @@ def call_agent(agent_id: str, user_content: str) -> dict:
         "kbn-xsrf": "true",
         "Content-Type": "application/json",
     }
-    payload = {"messages": [{"role": "user", "content": user_content}]}
     last_error = None
-    for path_tpl in CHAT_ENDPOINT_PATHS:
-        url = KIBANA_URL + path_tpl.format(agent_id=agent_id)
+    for spec in CHAT_ENDPOINT_SPECS:
+        path = spec["path"]
+        if spec.get("url_agent_id"):
+            path = path.format(agent_id=agent_id)
+        else:
+            path = path  # converse uses agent_id in body
+        url = KIBANA_URL + path
+        payload = spec["body"](agent_id, user_content)
         try:
             r = requests.post(
                 url,

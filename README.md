@@ -107,11 +107,11 @@ If `KIBANA_URL` and `KIBANA_API_KEY` are set in `.env`, the Streamlit app will c
 | **AGENT_AUDITOR_ID** | ID of the **Auditor** agent in Agent Builder. Default `incident-integrity-auditor`. |
 | **AGENT_TIMEOUT_SECS** | Optional. Seconds to wait for the agent chat API (default `60`). Increase for slow agents. |
 
-**Test agent connectivity (curl):**
+**Test agent connectivity (curl):** Uses the Kibana 9.2+ Agent Builder converse API.
 ```bash
-curl -s -X POST "${KIBANA_URL}/api/ai/agents/incident-narrator-agent/chat" \
+curl -s -X POST "${KIBANA_URL}/api/agent_builder/converse" \
   -H "Authorization: ApiKey ${KIBANA_API_KEY}" -H "kbn-xsrf: true" -H "Content-Type: application/json" \
-  -d '{"messages":[{"role":"user","content":"Output only: {\"ok\":true}"}]}'
+  -d '{"agent_id":"incident-narrator-agent","input":"Output only: {\"ok\":true}"}'
 ```
 
 ---
