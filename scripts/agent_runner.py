@@ -6,6 +6,7 @@ from typing import Any
 from .agent_builder_client import (
     AGENT_AUDITOR_ID,
     AGENT_NARRATOR_ID,
+    AGENT_NARRATOR_TIMEOUT_SECS,
     call_agent,
     is_agent_builder_configured,
 )
@@ -38,6 +39,8 @@ def extract_json_from_agent_response(resp: dict) -> dict:
     """Find the largest JSON object in any string field of resp (or nested). Return parsed dict. Raises on failure."""
     # Prefer Kibana converse API: response.message is the agent's reply (often JSON)
     message = (resp.get("response") or {}).get("message")
+    if message is not None and not isinstance(message, str):
+        message = str(message) if message else ""
     if isinstance(message, str) and message.strip():
         for start, end in _find_json_objects(message):
             try:
@@ -76,6 +79,9 @@ def extract_json_from_agent_response(resp: dict) -> dict:
                 continue
 
     if best is None:
+        msg = (resp.get("response") or {}).get("message")
+        if msg is None or (isinstance(msg, str) and not msg.strip()):
+            raise RuntimeError("Agent returned empty response (no message in response); try again or use local pipeline.")
         raise RuntimeError("No valid JSON object found in agent response")
     return best
 
@@ -87,7 +93,7 @@ def run_narrator_via_agent_builder(incident_id: str) -> dict:
 2. Produce a post-mortem and output ONLY a single valid JSON object, no markdown or extra text.
 Required top-level keys: incident_id, generated_at (ISO 8601), time_window ({{start, end}}), summary, impact ({{user_impact, duration_minutes, severity}}), timeline (array of {{ts, kind, service, ref, summary}}), claims (array with evidence_refs), suspected_root_causes, decision_integrity_hints, followups. Optional: decision_integrity_artifacts (array of DEP-* / RB-* refs).
 Output nothing but the JSON object."""
-    raw = call_agent(AGENT_NARRATOR_ID, prompt)
+    raw = call_agent(AGENT_NARRATOR_ID, prompt, timeout_secs=AGENT_NARRATOR_TIMEOUT_SECS)
     return extract_json_from_agent_response(raw)
 
 
