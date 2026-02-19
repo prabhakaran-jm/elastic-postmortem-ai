@@ -19,7 +19,7 @@
 
 FROM pmai-logs, pmai-alerts, pmai-changes, pmai-chat_messages, pmai-tickets
   METADATA _index
-| WHERE @timestamp >= "2026-02-10T09:58:00Z" AND @timestamp <= "2026-02-10T10:40:00Z"
+| WHERE @timestamp >= "{{START_TIME}}" AND @timestamp <= "{{END_TIME}}"
   AND (
     (_index == "pmai-logs" AND incident_id == "{{INCIDENT_ID}}" AND (level == "WARN" OR level == "ERROR"))
     OR (_index == "pmai-changes" AND (id == "DEP-{{INCIDENT_NUM}}" OR id == "RB-{{INCIDENT_NUM}}" OR title LIKE "*{{INCIDENT_ID}}*" OR notes LIKE "*{{INCIDENT_ID}}*"))

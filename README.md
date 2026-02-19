@@ -36,6 +36,8 @@ git **Windows (PowerShell):** same flow with `python -m venv venv`, `.\venv\Scri
 
 ## Architecture
 
+When **Kibana Agent Builder** is configured (`KIBANA_URL` + `KIBANA_API_KEY`), the Streamlit app uses it as the primary reasoning layer for both Narrator and Auditor. Otherwise it falls back to the local pipeline.
+
 ```mermaid
 flowchart LR
   subgraph ES["Elasticsearch"]
@@ -47,13 +49,21 @@ flowchart LR
     M[chat_messages]
   end
 
-  ES -->|ESQL timeline| N[Narrator]
-  N -->|postmortem JSON| R[Auditor]
-  N -->|audit JSON| OUT[out/ + optional store]
-  N -->|store| P[Postmortem_reports]
-  R -->|store| P
+  ES -->|ESQL timeline| KB_N["Kibana Agent Builder<br/>Narrator"]
+  ES -->|ESQL timeline| KB_A["Kibana Agent Builder<br/>Auditor"]
+  KB_N -->|postmortem JSON| KB_A
+  KB_N -->|store| P[Postmortem_reports]
+  KB_A -->|audit JSON| OUT[out/ + optional store]
+  KB_A -->|store| P
+
+  ES -.->|ESQL timeline| LOCAL_N[Local Narrator]
+  LOCAL_N -.->|postmortem JSON| LOCAL_A[Local Auditor]
+  LOCAL_N -.->|fallback| OUT
+  LOCAL_A -.->|fallback| OUT
 ```
 
+- **Primary path (Agent Builder):** Narrator and Auditor run in Kibana Agent Builder (converse API). They use ES|QL tools to pull the incident timeline from Elasticsearch, then produce post-mortem JSON and audit JSON. The UI shows *"Agent Builder"* in the execution trace when this path is used.
+- **Fallback path (local):** If Agent Builder is not configured or a call fails, the app uses the local deterministic Narrator and Auditor (no Kibana required). The UI shows *"local"* in the execution trace.
 - **Narrator:** Loads incident context (ES|QL over logs, alerts, changes, chat, tickets), enriches change summaries, produces post-mortem (summary, claims with evidence_refs, decision_integrity_artifacts).
 - **Auditor:** Validates refs against Elasticsearch, challenges unsupported claims, scores overall + decision integrity, emits governance findings.
 
@@ -91,7 +101,7 @@ Prefix `pmai` is from `ES_INDEX_PREFIX` (default `pmai`).
 
 ## Agent Builder mode
 
-If `KIBANA_URL` and `KIBANA_API_KEY` are set in `.env`, the Streamlit app will call **Kibana Agent Builder** for the Narrator and Auditor. Otherwise it uses the local deterministic pipeline (no Kibana required).
+If `KIBANA_URL` and `KIBANA_API_KEY` are set in `.env`, the Streamlit app will call **Kibana Agent Builder** for the Narrator and Auditor. Otherwise it uses the local deterministic pipeline (no Kibana required). For submission or demos, you can add screenshots of your agents to [docs/agent_builder.md](docs/agent_builder.md).
 
 - **Env vars:** `KIBANA_URL`, `KIBANA_API_KEY`; optional: `AGENT_NARRATOR_ID` (default `incident-narrator-agent`), `AGENT_AUDITOR_ID` (default `incident-integrity-auditor`), `AGENT_TIMEOUT_SECS` (default `60`), `AGENT_NARRATOR_TIMEOUT_SECS` (default `120`; narrator often needs longer).
 - **Fallback:** If the agent call fails or env is missing, the UI falls back to the local narrator/auditor and shows a short warning.

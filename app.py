@@ -326,13 +326,61 @@ with tab_timeline:
     rows = timeline_tab[-20:] if not show_full else timeline_tab
     st.dataframe(rows, use_container_width=True)
 
+
+def _narrator_to_markdown(data: dict) -> str:
+    """Render narrator report as readable markdown: summary, impact, claims, root causes, follow-ups."""
+    lines = []
+    if data.get("summary"):
+        lines.append("## Summary\n")
+        lines.append(data["summary"].strip())
+        lines.append("")
+    impact = data.get("impact") or {}
+    if impact:
+        lines.append("## Impact\n")
+        lines.append(f"- **User impact:** {impact.get('user_impact', '—')}")
+        lines.append(f"- **Duration:** {impact.get('duration_minutes', '—')} min")
+        lines.append(f"- **Severity:** {impact.get('severity', '—')}")
+        lines.append("")
+    claims = data.get("claims") or []
+    if claims:
+        lines.append("## Claims (evidence-linked)\n")
+        lines.append("| # | Statement | Evidence refs |")
+        lines.append("|---|-----------|----------------|")
+        for i, c in enumerate(claims, 1):
+            stmt = (c.get("statement") or "").replace("|", "\\|")[:80]
+            refs = ", ".join(c.get("evidence_refs") or [])
+            lines.append(f"| {i} | {stmt} | {refs} |")
+        lines.append("")
+    causes = data.get("suspected_root_causes") or []
+    if causes:
+        lines.append("## Suspected root causes\n")
+        for c in causes:
+            lines.append(f"- {c}" if isinstance(c, str) else f"- {c.get('description', c)}")
+        lines.append("")
+    followups = data.get("followups") or []
+    if followups:
+        lines.append("## Follow-ups\n")
+        lines.append("| Action | Owner | Priority |")
+        lines.append("|--------|-------|----------|")
+        for f in followups:
+            action = (f.get("action") or "").replace("|", "\\|")
+            owner = (f.get("owner_role") or "").replace("|", "\\|")
+            prio = (f.get("priority") or "").replace("|", "\\|")
+            lines.append(f"| {action} | {owner} | {prio} |")
+    return "\n".join(lines) if lines else "_No content._"
+
+
 with tab_pm:
     st.caption("Evidence-linked post-mortem: summary, claims, root causes (from Narrator agent).")
     narrator = st.session_state.get("narrator")
     if narrator:
-        st.json(narrator)
+        show_raw_pm = st.checkbox("Show raw JSON", value=False, key="show_raw_narrator")
+        if show_raw_pm:
+            st.json(narrator)
+        else:
+            st.markdown(_narrator_to_markdown(narrator))
     else:
-        st.info("Generate a post-mortem to view JSON.")
+        st.info("Generate a post-mortem to view output.")
 
 with tab_audit:
     st.caption("Integrity audit: validated/challenged claims, governance findings, scores.")
