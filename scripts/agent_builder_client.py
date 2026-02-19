@@ -11,17 +11,26 @@ load_dotenv()
 
 KIBANA_URL = (os.getenv("KIBANA_URL") or "").strip().rstrip("/")
 KIBANA_API_KEY = (os.getenv("KIBANA_API_KEY") or "").strip()
+KIBANA_SPACE_ID = (os.getenv("KIBANA_SPACE_ID") or "").strip()  # e.g. default or my-space
+KIBANA_CONVERSE_PATH = (os.getenv("KIBANA_CONVERSE_PATH") or "").strip()  # override full path if needed
 AGENT_NARRATOR_ID = os.getenv("AGENT_NARRATOR_ID", "incident-narrator-agent").strip()
 AGENT_AUDITOR_ID = os.getenv("AGENT_AUDITOR_ID", "incident-integrity-auditor").strip()
 AGENT_TIMEOUT_SECS = max(5, min(300, int(os.getenv("AGENT_TIMEOUT_SECS", "60"))))
 
-# Kibana Agent Builder: POST /api/agent_builder/converse with body { agent_id, input } (Kibana 9.2+).
-# Older or alternate paths (agent_id in URL, messages array) kept as fallbacks.
-CHAT_ENDPOINT_SPECS = [
-    {"path": "/api/agent_builder/converse", "body": lambda aid, content: {"agent_id": aid, "input": content}},
-    {"path": "/api/ai/agents/{agent_id}/chat", "body": lambda aid, content: {"messages": [{"role": "user", "content": content}]}, "url_agent_id": True},
-    {"path": "/api/ai/agent_builder/agents/{agent_id}/chat", "body": lambda aid, content: {"messages": [{"role": "user", "content": content}]}, "url_agent_id": True},
-]
+# Build list of (path, body_fn, url_agent_id) for converse. Kibana 9.2+: POST .../converse with { agent_id, input }.
+def _converse_specs() -> list:
+    specs = []
+    if KIBANA_CONVERSE_PATH:
+        specs.append({"path": KIBANA_CONVERSE_PATH, "body": lambda aid, content: {"agent_id": aid, "input": content}})
+    if KIBANA_SPACE_ID:
+        specs.append({"path": f"/s/{KIBANA_SPACE_ID}/api/agent_builder/converse", "body": lambda aid, content: {"agent_id": aid, "input": content}})
+    specs.extend([
+        {"path": "/api/agent_builder/converse", "body": lambda aid, content: {"agent_id": aid, "input": content}},
+        {"path": "/app/api/agent_builder/converse", "body": lambda aid, content: {"agent_id": aid, "input": content}},
+        {"path": "/api/ai/agents/{agent_id}/chat", "body": lambda aid, content: {"messages": [{"role": "user", "content": content}]}, "url_agent_id": True},
+        {"path": "/api/ai/agent_builder/agents/{agent_id}/chat", "body": lambda aid, content: {"messages": [{"role": "user", "content": content}]}, "url_agent_id": True},
+    ])
+    return specs
 
 
 def is_agent_builder_configured() -> bool:
@@ -38,7 +47,7 @@ def call_agent(agent_id: str, user_content: str) -> dict:
         "Content-Type": "application/json",
     }
     last_error = None
-    for spec in CHAT_ENDPOINT_SPECS:
+    for spec in _converse_specs():
         path = spec["path"]
         if spec.get("url_agent_id"):
             path = path.format(agent_id=agent_id)

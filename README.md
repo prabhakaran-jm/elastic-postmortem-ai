@@ -106,6 +106,10 @@ If `KIBANA_URL` and `KIBANA_API_KEY` are set in `.env`, the Streamlit app will c
 | **AGENT_NARRATOR_ID** | ID of the **Narrator** agent in Kibana Agent Builder (e.g. **Machine Learning** → **Agent Builder** or **Search** → **Agent**). Use the agent’s ID/slug from the agent config or URL. Default `incident-narrator-agent` if you named the agent that. |
 | **AGENT_AUDITOR_ID** | ID of the **Auditor** agent in Agent Builder. Default `incident-integrity-auditor`. |
 | **AGENT_TIMEOUT_SECS** | Optional. Seconds to wait for the agent chat API (default `60`). Increase for slow agents. |
+| **KIBANA_SPACE_ID** | Optional. If your agents are in a non-default space, set this (e.g. `default` or your space id). The client will call `/s/{space_id}/api/agent_builder/converse`. |
+| **KIBANA_CONVERSE_PATH** | Optional. If you get 404, set this to the full path that works (e.g. from a working curl). Overrides the default path. |
+
+**If you get HTTP 404:** Your deployment may use a space or a different API path. Try (1) setting `KIBANA_SPACE_ID=default`, or (2) finding the correct path in Kibana/API docs and setting `KIBANA_CONVERSE_PATH` to that path (e.g. `/s/default/api/agent_builder/converse`). Ensure `KIBANA_URL` is the Kibana base URL with no path (e.g. `https://<deploy>.kb.<region>.gcp.cloud.es.io`), unless your API lives under a path.
 
 **Test agent connectivity (curl):** Uses the Kibana 9.2+ Agent Builder converse API.
 ```bash
